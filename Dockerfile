@@ -14,9 +14,9 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Download required NLTK resources and trigger language_tool download in build phase to speed up runtime container start
+# Download required NLTK resources in build phase to speed up runtime container start
+# (We download LanguageTool at runtime to avoid Cloudflare/rate-limit blocks on cloud build servers like Render)
 RUN python -c "import nltk; nltk.download('punkt', quiet=True); nltk.download('punkt_tab', quiet=True); nltk.download('vader_lexicon', quiet=True); nltk.download('averaged_perceptron_tagger', quiet=True); nltk.download('averaged_perceptron_tagger_eng', quiet=True)"
-RUN python -c "import language_tool_python; language_tool_python.LanguageTool('en-US')"
 
 # Copy the rest of the application
 COPY . .
