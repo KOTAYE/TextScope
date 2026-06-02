@@ -820,12 +820,19 @@
         .footer a { color: var(--accent-1); text-decoration: none; }
 
         @media (max-width: 700px) {
-            .header h1 { font-size: 24px; }
-            .tabs { flex-direction: column; }
-            .emotions-section { flex-direction: column; }
+            .header { padding: 30px 10px 15px; }
+            .header h1 { font-size: 22px; }
+            .container { padding: 0 10px 20px; }
+            .card { padding: 16px; border-radius: 12px; margin-bottom: 14px; }
+            .card-title { font-size: 16px; margin-bottom: 12px; }
+            .tabs { flex-direction: column; gap: 6px; }
+            .tab-btn { padding: 10px 12px; font-size: 13px; }
+            .emotions-section { flex-direction: column; gap: 15px; }
             .ai-gauge-section { flex-direction: column; gap: 20px; }
-            .detail-grid { grid-template-columns: 1fr 1fr; }
-            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .detail-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+            .export-btn { width: 100%; justify-content: center; }
+            .highlight-legend { flex-wrap: wrap; gap: 8px; }
         }
         @media (max-width: 420px) {
             .detail-grid { grid-template-columns: 1fr; }
@@ -1359,7 +1366,7 @@
 </div>
 
 <footer class="footer">
-    <p>TextScope &copy; 2026 | Projekt NLP wykonany jako zaawansowana praca zaliczeniowa</p>
+    <p>TextScope &copy; 2026</p>
 </footer>
 
 <script>
