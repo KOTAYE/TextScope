@@ -8,6 +8,7 @@ import csv
 import io
 import os
 import sys
+import requests
 from typing import Dict, Union, Any, List
 
 from flask import Flask, render_template, request, jsonify, Response
@@ -28,7 +29,11 @@ from analyzers import (
     summarize_text,
     cluster_reviews,
     check_grammar,
-    analyze_text_with_llm
+    analyze_text_with_llm,
+    explain_ai_detection_with_llm,
+    detect_fake_review_with_llm,
+    chat_with_reviews_with_llm,
+    generate_timeline_annotations
 )
 from utils import (
     generate_sentiment_recommendations,
@@ -168,6 +173,8 @@ def analyze() -> Response:
         else:
             recommendations = generate_sentiment_recommendations(sentiment, emotions)
 
+        fake_detection = detect_fake_review_with_llm(text)
+
         return jsonify({
             'sentiment': sentiment,
             'words': words,
@@ -176,7 +183,8 @@ def analyze() -> Response:
             'topics': topics,
             'language': language,
             'recommendations': recommendations,
-            'llm_analysis': llm_analysis
+            'llm_analysis': llm_analysis,
+            'fake_detection': fake_detection
         })
 
     elif analysis_type == 'ai_detect':
@@ -184,12 +192,17 @@ def analyze() -> Response:
         stats = get_text_stats(text)
         language = detect_language(text)
         recommendations = generate_ai_recommendations(ai)
+        
+        ai_explanation = None
+        if not ai.get('error'):
+            ai_explanation = explain_ai_detection_with_llm(text, ai.get('details', {}), ai.get('ai_probability', 0.0))
 
         return jsonify({
             'ai': ai,
             'stats': stats,
             'language': language,
-            'recommendations': recommendations
+            'recommendations': recommendations,
+            'ai_explanation': ai_explanation
         })
 
     return jsonify({'error': 'Nieznany typ analizy'}), 400
@@ -209,7 +222,11 @@ def analyze_sentences() -> Response:
         return jsonify({'error': 'Wprowadź tekst do analizy'}), 400
 
     results = analyze_sentences_sentiment(text)
-    return jsonify({'sentences': results})
+    turning_points = generate_timeline_annotations(results)
+    return jsonify({
+        'sentences': results,
+        'turning_points': turning_points
+    })
 
 @app.route('/summarize', methods=['POST'])
 def summarize() -> Response:
@@ -342,11 +359,33 @@ def analyze_batch() -> Response:
 
         return jsonify({
             'summary': summary,
-            'results': results
+            'results': results,
+            'full_reviews': raw_texts
         })
 
     except Exception as e:
         return jsonify({'error': f'Błąd podczas przetwarzania pliku: {str(e)}'}), 500
+
+@app.route('/chat_batch', methods=['POST'])
+def chat_batch() -> Response:
+    """
+    Sends the user query, list of CSV reviews, and history to Gemini 2.0 Flash for analysis.
+    """
+    data = request.get_json() or {}
+    message = str(data.get('message', '')).strip()
+    reviews = data.get('reviews', [])
+    history = data.get('history', [])
+
+    if not message:
+        return jsonify({'error': 'Wiadomość nie może być pusta.'}), 400
+
+    if not isinstance(reviews, list):
+        return jsonify({'error': 'Błędny format recenzji.'}), 400
+
+    reviews_clean = [str(r).strip() for r in reviews if str(r).strip()]
+    
+    reply = chat_with_reviews_with_llm(message, reviews_clean, history)
+    return jsonify({'reply': reply})
 
 @app.route('/compare', methods=['POST'])
 def compare_texts() -> Response:
@@ -725,6 +764,81 @@ def generate_example_route() -> Response:
     lang_fallbacks = fallbacks.get(lang, fallbacks['pl'])
     text_fallback = lang_fallbacks.get(example_type, lang_fallbacks['pos'])
     return jsonify({'text': text_fallback, 'source': 'local_fallback'})
+
+@app.route('/rewrite', methods=['POST'])
+def rewrite_route() -> Response:
+    """
+    Rewrites the input text using Google Gemini 2.0 Flash based on target style/tone.
+    """
+    data = request.get_json() or {}
+    text = str(data.get('text', '')).strip()
+    tone = str(data.get('tone', 'human')).strip().lower()
+
+    if not text:
+        return jsonify({'error': 'Wprowadź tekst do przepisania'}), 400
+
+    api_key = os.getenv("GEMINI_API_KEY", "").strip()
+    if not api_key:
+        return jsonify({'error': 'Klucz API Gemini nie jest skonfigurowany. Ta funkcja wymaga aktywnego klucza API.'}), 400
+
+    prompts = {
+        'human': (
+            "Przepisz poniższy tekst tak, aby brzmiał niezwykle naturalnie, płynnie i ludzko (jak żywy komentator lub recenzent, a nie robot). "
+            "Wyeliminuj typowe sztuczne wzorce AI, nadmiernie powtarzalne spójniki logiczne. "
+            "Zachowaj pierwotny język tekstu (jeśli był po polsku - po polsku, jeśli po angielsku - po angielsku). "
+            "Zachowaj wszystkie fakty, nazwy własne i ogólny sens tekstu. "
+            "Zwróć TYLKO gotowy przepisany tekst i nic więcej."
+        ),
+        'positive': (
+            "Przepisz poniższy tekst tak, aby miał wyraźnie pozytywny, entuzjastyczny, zadowolony i zachęcający wydźwięk emocjonalny (sentyment). "
+            "Zachowaj pierwotny język tekstu, fakty, nazwy własne i sens. "
+            "Zwróć TYLKO gotowy przepisany tekst i nic więcej."
+        ),
+        'neutral': (
+            "Przepisz poniższy tekst tak, aby miał w pełni neutralny, obiektywny, chłodny, zrównoważony i faktograficzny wydźwięk (sentyment). "
+            "Zachowaj pierwotny język tekstu, fakty, nazwy własne i ogólny sens. "
+            "Zwróć TYLKO gotowy przepisany tekst i nic więcej."
+        ),
+        'negative': (
+            "Przepisz poniższy tekst tak, aby miał wyraźnie krytyczny, niezadowolony, negatywny i ostrzegający wydźwięk emocjonalny (sentyment). "
+            "Zachowaj pierwotny język tekstu, fakty, nazwy własne i ogólny sens. "
+            "Zwróć TYLKO gotowy przepisany tekst i nic więcej."
+        )
+    }
+
+    prompt_inst = prompts.get(tone, prompts['human'])
+    prompt = f"{prompt_inst}\n\nTekst do przepisania:\n\"{text}\""
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}]
+    }
+    headers = {"Content-Type": "application/json"}
+    
+    try:
+        response = requests.post(url, json=payload, headers=headers, timeout=12)
+        if response.status_code == 200:
+            res_data = response.json()
+            candidates = res_data.get("candidates", [])
+            if candidates:
+                text_content = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "").strip()
+                if text_content:
+                    if text_content.startswith('"') and text_content.endswith('"'):
+                        text_content = text_content[1:-1]
+                    return jsonify({'rewritten_text': text_content})
+        elif response.status_code == 429:
+            return jsonify({'error': 'Przekroczono limit zapytań do API Gemini (Status 429). Serwer jest przeciążony. Odczekaj chwilę przed kolejną próbą.'}), 429
+        return jsonify({'error': f'Błąd API Gemini: Status {response.status_code}'}), 500
+    except Exception as e:
+        return jsonify({'error': f'Błąd podczas łączenia z Gemini: {str(e)}'}), 500
+
+@app.route('/ping', methods=['GET'])
+def ping_route() -> Response:
+    """
+    Simple ping endpoint to check if the server is awake and ready.
+    Used for cold start warning banners.
+    """
+    return jsonify({'status': 'ok'})
 
 if __name__ == '__main__':
     print("=" * 50)

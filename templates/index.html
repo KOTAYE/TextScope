@@ -841,6 +841,17 @@
 </head>
 <body>
 
+<!-- Cold Start Warning Banner -->
+<div id="cold-start-banner" style="display: none; position: fixed; top: 0; left: 0; right: 0; background: rgba(124, 92, 252, 0.95); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); color: white; text-align: center; padding: 12px 20px; font-size: 13px; font-weight: 600; z-index: 9999; box-shadow: 0 4px 20px rgba(0,0,0,0.3); border-bottom: 1px solid rgba(255,255,255,0.2); justify-content: center; align-items: center; gap: 10px; transition: opacity 0.5s ease, transform 0.5s ease; transform: translateY(-100%);">
+    <style>
+        @keyframes banner-spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+    <div style="width: 14px; height: 14px; border: 2px solid white; border-top-color: transparent; border-radius: 50%; animation: banner-spin 1s linear infinite; flex-shrink: 0;"></div>
+    <span>Serwer się uruchamia, może to potrwać ~30 sekund...</span>
+</div>
+
 <div class="bg-effects">
     <div class="bg-orb"></div>
     <div class="bg-orb"></div>
@@ -932,9 +943,48 @@
             </div>
         </div>
 
-        <button class="analyze-btn" onclick="analyzeText()" id="analyze-btn">
-            ✨ Analizuj tekst
-        </button>
+        <div style="display: flex; gap: 12px; margin-top: 16px;">
+            <button class="analyze-btn" onclick="analyzeText()" id="analyze-btn" style="flex: 2; margin-top: 0;">
+                ✨ Analizuj tekst
+            </button>
+            <button class="analyze-btn" onclick="toggleRewriteAssistant()" id="rewrite-btn" style="flex: 1; margin-top: 0; background: rgba(124,92,252,0.1); border: 1px solid var(--accent-1); color: var(--text-primary);">
+                ✍️ Przepisz tekst
+            </button>
+        </div>
+
+        <!-- Rewrite Assistant Card -->
+        <div id="rewrite-assistant-card" style="display: none; margin-top: 14px; padding: 16px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: var(--radius-md); animation: fadeIn 0.4s ease;">
+            <div style="font-weight: 700; font-size: 13px; color: var(--accent-1); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px;">
+                ✍️ Asystent Przepisywania Tekstu
+            </div>
+            <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.5;">Wybierz docelowy styl lub ton, w jakim Gemini ma przepisać Twój tekst:</p>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px;">
+                <button class="example-chip tone-btn active" id="tone-human" onclick="setRewriteTone('human')">👤 Styl Ludzki (AI -> Człowiek)</button>
+                <button class="example-chip tone-btn" id="tone-positive" onclick="setRewriteTone('positive')">😊 Pozytywny</button>
+                <button class="example-chip tone-btn" id="tone-neutral" onclick="setRewriteTone('neutral')">😐 Neutralny</button>
+                <button class="example-chip tone-btn" id="tone-negative" onclick="setRewriteTone('negative')">😢 Negatywny</button>
+            </div>
+            <button class="analyze-btn" onclick="executeRewrite()" id="execute-rewrite-btn" style="padding: 10px; font-size: 13px; margin-top: 0; width: 100%;">
+                ⚡ Przepisz przez Gemini AI
+            </button>
+            
+            <!-- Original vs Rewritten Diff Viewer -->
+            <div id="rewrite-diff-section" style="display: none; margin-top: 18px; border-top: 1px solid var(--border-color); padding-top: 16px;">
+                <div style="display: flex; gap: 16px; flex-wrap: wrap;" id="rewrite-diff-grid">
+                    <div style="flex: 1; min-width: 250px;">
+                        <div style="font-size: 11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; margin-bottom: 6px;">Oryginał</div>
+                        <div id="rewrite-original" style="background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); padding: 12px; border-radius: var(--radius-sm); font-size: 13px; color: var(--text-secondary); line-height: 1.5; min-height: 100px; white-space: pre-wrap;"></div>
+                    </div>
+                    <div style="flex: 1; min-width: 250px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <span style="font-size: 11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase;">Przepisany tekst (Podgląd zmian)</span>
+                            <button class="example-chip" onclick="applyRewrittenText()" style="background: var(--accent-1); border:none; color:white; font-size:11px; font-weight:600; padding:2px 8px; border-radius:4px; cursor:pointer; margin-top:0;">📥 Zastosuj</button>
+                        </div>
+                        <div id="rewrite-diff-view" style="background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); padding: 12px; border-radius: var(--radius-sm); font-size: 13px; line-height: 1.5; min-height: 100px; white-space: pre-wrap;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="card" id="batch-card" style="display: none;">
@@ -1059,6 +1109,7 @@
             <div style="width: 100%; height: 260px;">
                 <canvas id="sentences-chart" style="width: 100%; height: 260px;"></canvas>
             </div>
+            <div id="timeline-turning-points" style="margin-top: 20px; display: none;"></div>
         </div>
 
         <div class="card">
@@ -1128,6 +1179,34 @@
             </div>
         </div>
 
+        <div class="card" id="fake-review-card" style="display:none;">
+            <div class="card-title">
+                <div class="icon">🛡️</div>
+                <span>Detektor wiarygodności opinii (AI)</span>
+            </div>
+            <p style="color: var(--text-secondary); font-size: 12px; margin-bottom: 12px;">
+                Analiza autentyczności i wiarygodności recenzji na podstawie wskaźników manipulacji, powtarzalności i szczegółowości:
+            </p>
+            <div style="display: flex; flex-direction: column; gap: 12px; padding: 14px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+                <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 13.5px; font-weight: 600; color: var(--text-secondary);">Werdykt:</span>
+                        <span id="fake-verdict-badge" class="badge" style="padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; text-transform: uppercase;">—</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 13.5px; font-weight: 600; color: var(--text-secondary);">Pewność analizy:</span>
+                        <div style="background: rgba(255,255,255,0.06); border-radius: 10px; width: 100px; height: 8px; overflow: hidden; position: relative;">
+                            <div id="fake-confidence-bar" style="background: var(--accent-1); height: 100%; width: 0%; transition: width 0.5s ease-in-out;"></div>
+                        </div>
+                        <span id="fake-confidence-val" style="font-size: 13px; font-weight: 700; color: var(--text-primary);">0%</span>
+                    </div>
+                </div>
+                <div id="fake-reasoning-container" style="font-size: 13.5px; line-height: 1.5; color: var(--text-secondary); border-top: 1px solid rgba(255,255,255,0.06); padding-top: 10px; margin-top: 2px;">
+                    <strong>🔍 Uzasadnienie:</strong> <span id="fake-reasoning-text" style="font-style: italic;">Brak danych.</span>
+                </div>
+            </div>
+        </div>
+
         <div class="note">
             <strong>⚠️ Uwaga:</strong>
             Analiza działa najlepiej z tekstem w języku angielskim i polskim.
@@ -1165,6 +1244,16 @@
                     
                     <div class="lang-badge" id="ai-lang-badge" style="margin-top: 12px; display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; background: rgba(255,255,255,0.04); border: 1px solid var(--border-color); border-radius: 20px; font-size: 11px; font-weight: 600; color: var(--text-secondary);">
                         🌐 Język: <span id="ai-lang-val">—</span>
+                    </div>
+
+                    <!-- AI Explanation Section -->
+                    <div id="ai-explanation-card" style="margin-top: 16px; padding: 12px; background: rgba(124, 92, 252, 0.08); border: 1px solid rgba(124, 92, 252, 0.2); border-radius: var(--radius-sm); display: none; text-align: left; animation: fadeIn 0.4s ease;">
+                        <div style="font-weight: 700; font-size: 12px; color: #a78bfa; display: flex; align-items: center; gap: 6px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;">
+                            🔍 Dlaczego taki wynik?
+                        </div>
+                        <div id="ai-explanation-text" style="font-size: 13px; color: var(--text-secondary); line-height: 1.5; font-style: italic;">
+                            ...
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1375,6 +1464,40 @@
                 <tbody id="batch-table-body"></tbody>
             </table>
         </div>
+
+        <!-- CSV Chatbot Card -->
+        <div class="card" id="csv-chatbot-card" style="margin-top: 24px;">
+            <div class="card-title">
+                <div class="icon">💬</div>
+                <span>Chatbot AI: Analizuj opinie z pliku</span>
+            </div>
+            <p style="color: var(--text-secondary); font-size: 12px; margin-bottom: 16px;">
+                Zadaj pytanie dotyczące wszystkich opinii załadowanych z pliku CSV. Asystent przeanalizuje trendy i odpowie w oparciu o treść recenzji.
+            </p>
+            
+            <!-- Chat Messages Container -->
+            <div id="csv-chat-messages" style="height: 350px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding: 16px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 12px; margin-bottom: 16px; scroll-behavior: smooth;">
+                <!-- Initial Welcome Message -->
+                <div class="chat-bubble model" style="align-self: flex-start; max-width: 85%; padding: 12px 16px; background: rgba(124, 92, 252, 0.1); border-left: 4px solid var(--accent-1); border-radius: 4px 16px 16px 16px; color: var(--text-primary); font-size: 13px; line-height: 1.5;">
+                    Cześć! Jestem Twoim inteligentnym asystentem biznesowym TextScope. Wyodrębniłem opinie z Twojego pliku CSV. 📈<br><br>
+                    <strong>Możesz mnie zapytać na przykład o:</strong>
+                    <ul style="margin: 8px 0 0 16px; padding: 0; list-style-type: disc; display: flex; flex-direction: column; gap: 4px;">
+                        <li><a href="#" onclick="setCsvChatPrompt('Co najbardziej irytuje klientów?'); return false;" style="color: var(--accent-1); text-decoration: none; font-weight: 500;">Co najbardziej irytuje klientów?</a></li>
+                        <li><a href="#" onclick="setCsvChatPrompt('Jakie są najczęstsze zalety i mocne strony produktu?'); return false;" style="color: var(--accent-1); text-decoration: none; font-weight: 500;">Jakie są najczęstsze zalety i mocne strony?</a></li>
+                        <li><a href="#" onclick="setCsvChatPrompt('Podsumuj ogólny ton opinii i napisz krótkie wnioski dla biznesu.'); return false;" style="color: var(--accent-1); text-decoration: none; font-weight: 500;">Podsumuj ogólny ton i wyciągnij wnioski biznesowe.</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- Input Area -->
+            <div style="display: flex; gap: 10px; align-items: stretch;">
+                <textarea id="csv-chat-input" placeholder="Zadaj pytanie dotyczące opinii z pliku CSV..." style="flex: 1; min-height: 50px; max-height: 120px; padding: 12px 16px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 12px; color: var(--text-primary); font-size: 13px; font-family: inherit; resize: vertical; outline: none; transition: border-color 0.2s;" onkeydown="handleCsvChatKeydown(event)"></textarea>
+                <button id="csv-chat-send-btn" onclick="sendCsvChatMessage()" style="padding: 0 24px; background: var(--accent-gradient); border: none; border-radius: 12px; color: white; font-weight: 600; font-size: 13px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                    <span>Wyślij</span>
+                    <span style="font-size: 14px;">✈️</span>
+                </button>
+            </div>
+        </div>
     </div>
 
     <div class="card" style="margin-top: 10px;">
@@ -1402,6 +1525,205 @@ let sentencesChart = null;
 let isCompareMode = false;
 let selectedFile = null;
 let lastAnalyzedData = null;
+let loadedCsvReviews = [];
+let csvChatHistory = [];
+
+// Cold start ping checker
+let isServerAwake = false;
+
+function checkServerStatus() {
+    const banner = document.getElementById('cold-start-banner');
+    if (isServerAwake) return;
+    
+    banner.style.display = 'flex';
+    // Small delay to ensure display is applied before transition
+    setTimeout(() => {
+        if (isServerAwake) return;
+        banner.style.opacity = '1';
+        banner.style.transform = 'translateY(0)';
+    }, 50);
+    
+    fetch('/ping')
+        .then(res => {
+            if (res.ok) {
+                hideColdStartBanner();
+            } else {
+                setTimeout(checkServerStatus, 3000);
+            }
+        })
+        .catch(() => {
+            setTimeout(checkServerStatus, 3000);
+        });
+}
+
+function hideColdStartBanner() {
+    isServerAwake = true;
+    const banner = document.getElementById('cold-start-banner');
+    if (banner) {
+        banner.style.opacity = '0';
+        banner.style.transform = 'translateY(-100%)';
+        setTimeout(() => {
+            banner.style.display = 'none';
+        }, 500);
+    }
+}
+
+// Start checking on DOMContentLoaded
+window.addEventListener('DOMContentLoaded', checkServerStatus);
+
+// Rewrite Assistant
+let selectedRewriteTone = 'human';
+let lastRewrittenText = '';
+
+function toggleRewriteAssistant() {
+    const card = document.getElementById('rewrite-assistant-card');
+    const btn = document.getElementById('rewrite-btn');
+    if (card.style.display === 'none') {
+        card.style.display = 'block';
+        btn.style.background = 'rgba(124,92,252,0.2)';
+        btn.style.borderColor = '#7c5cfc';
+    } else {
+        card.style.display = 'none';
+        btn.style.background = 'rgba(255,255,255,0.05)';
+        btn.style.borderColor = 'var(--border-color)';
+    }
+}
+
+function setRewriteTone(tone) {
+    selectedRewriteTone = tone;
+    // Update active button styles
+    const buttons = document.querySelectorAll('.tone-btn');
+    buttons.forEach(btn => {
+        btn.classList.remove('active');
+        btn.style.background = 'rgba(255,255,255,0.05)';
+        btn.style.borderColor = 'rgba(255,255,255,0.1)';
+        btn.style.color = 'var(--text-secondary)';
+    });
+    
+    let activeBtn;
+    if (tone === 'human') activeBtn = document.getElementById('tone-human');
+    else if (tone === 'positive') activeBtn = document.getElementById('tone-positive');
+    else if (tone === 'neutral') activeBtn = document.getElementById('tone-neutral');
+    else if (tone === 'negative') activeBtn = document.getElementById('tone-negative');
+    
+    if (activeBtn) {
+        activeBtn.classList.add('active');
+        activeBtn.style.background = 'rgba(124, 92, 252, 0.2)';
+        activeBtn.style.borderColor = '#7c5cfc';
+        activeBtn.style.color = 'white';
+    }
+}
+
+async function executeRewrite() {
+    const text = document.getElementById('text-input').innerText.trim();
+    if (!text) { alert('Wprowadź tekst przed przepisywaniem.'); return; }
+    
+    const execBtn = document.getElementById('execute-rewrite-btn');
+    const prevBtnText = execBtn.textContent;
+    execBtn.disabled = true;
+    execBtn.textContent = '⚡ Przepisywanie przez Gemini AI...';
+    
+    try {
+        const res = await fetch('/rewrite', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                text: text,
+                tone: selectedRewriteTone
+            })
+        });
+        const data = await res.json();
+        
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+        
+        lastRewrittenText = data.rewritten_text;
+        
+        document.getElementById('rewrite-original').textContent = text;
+        const diffHtml = generateWordDiff(text, lastRewrittenText);
+        document.getElementById('rewrite-diff-view').innerHTML = diffHtml;
+        
+        document.getElementById('rewrite-diff-section').style.display = 'block';
+        document.getElementById('rewrite-diff-section').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } catch (err) {
+        alert('Błąd przepisywania: ' + err.message);
+    } finally {
+        execBtn.disabled = false;
+        execBtn.textContent = prevBtnText;
+    }
+}
+
+function applyRewrittenText() {
+    if (!lastRewrittenText) return;
+    const input = document.getElementById('text-input');
+    input.innerText = lastRewrittenText;
+    updateCounters();
+    
+    // Smooth scroll back to input
+    input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    
+    // Hide rewrite section and show highlight
+    document.getElementById('rewrite-diff-section').style.display = 'none';
+    toggleRewriteAssistant();
+    
+    if (typeof handleRealTimeHighlight === 'function') {
+        handleRealTimeHighlight();
+    }
+}
+
+function generateWordDiff(original, rewritten) {
+    const tokenize = (str) => {
+        return str.match(/\s+|\w+|[^\w\s]+/g) || [];
+    };
+    
+    const oTokens = tokenize(original);
+    const rTokens = tokenize(rewritten);
+    
+    const n = oTokens.length;
+    const m = rTokens.length;
+    const dp = Array.from({ length: n + 1 }, () => Array(m + 1).fill(0));
+    
+    for (let i = 1; i <= n; i++) {
+        for (let j = 1; j <= m; j++) {
+            if (oTokens[i - 1] === rTokens[j - 1]) {
+                dp[i][j] = dp[i - 1][j - 1] + 1;
+            } else {
+                dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+            }
+        }
+    }
+    
+    let i = n, j = m;
+    const diff = [];
+    
+    while (i > 0 || j > 0) {
+        if (i > 0 && j > 0 && oTokens[i - 1] === rTokens[j - 1]) {
+            diff.push({ type: 'equal', text: oTokens[i - 1] });
+            i--;
+            j--;
+        } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+            diff.push({ type: 'add', text: rTokens[j - 1] });
+            j--;
+        } else {
+            diff.push({ type: 'delete', text: oTokens[i - 1] });
+            i--;
+        }
+    }
+    
+    diff.reverse();
+    
+    return diff.map(part => {
+        if (part.type === 'add') {
+            return `<span style="background: rgba(74, 222, 128, 0.25); color: #4ade80; text-decoration: none; padding: 2px 0; border-radius: 2px;">${part.text}</span>`;
+        } else if (part.type === 'delete') {
+            return `<span style="background: rgba(248, 113, 113, 0.25); color: #f87171; text-decoration: line-through; padding: 2px 0; border-radius: 2px;">${part.text}</span>`;
+        } else {
+            return part.text;
+        }
+    }).join('');
+}
 
 let generationLanguage = 'pl';
 
@@ -1720,6 +2042,7 @@ async function analyzeText() {
             body: JSON.stringify({ text, type: currentTab })
         });
         const data = await res.json();
+        hideColdStartBanner();
 
         if (data.error && typeof data.error === 'string') {
             alert(data.error);
@@ -1816,13 +2139,23 @@ async function fetchAdvancedFeatures(text) {
     }
 }
 
-function renderSentencesChart(sentences) {
+function renderSentencesChart(sentences, turningPoints = []) {
     if (sentencesChart) { sentencesChart.destroy(); sentencesChart = null; }
 
     const ctx = document.getElementById('sentences-chart').getContext('2d');
     const labels = sentences.map((_, i) => `Zdanie ${i + 1}`);
     const data = sentences.map(s => s.sentiment_score);
-    const pointColors = sentences.map(s => s.sentiment_score > 0.1 ? '#4ade80' : (s.sentiment_score < -0.1 ? '#f87171' : '#facc15'));
+    
+    const isTurningPoint = (i) => turningPoints.some(tp => tp.index === i);
+    const pointRadii = sentences.map((_, i) => isTurningPoint(i) ? 10 : 6);
+    const pointHoverRadii = sentences.map((_, i) => isTurningPoint(i) ? 12 : 8);
+    const pointColors = sentences.map((_, i) => {
+        if (isTurningPoint(i)) return '#d946ef'; // vibrant magenta for turning points
+        const score = sentences[i].sentiment_score;
+        return score > 0.1 ? '#4ade80' : (score < -0.1 ? '#f87171' : '#facc15');
+    });
+    const pointBorderColors = sentences.map((_, i) => isTurningPoint(i) ? '#ffffff' : '#0f0f1a');
+    const pointBorderWidths = sentences.map((_, i) => isTurningPoint(i) ? 3 : 2);
 
     sentencesChart = new Chart(ctx, {
         type: 'line',
@@ -1834,10 +2167,10 @@ function renderSentencesChart(sentences) {
                 borderColor: '#7c5cfc',
                 borderWidth: 3,
                 pointBackgroundColor: pointColors,
-                pointBorderColor: '#0f0f1a',
-                pointBorderWidth: 2,
-                pointRadius: 6,
-                pointHoverRadius: 8,
+                pointBorderColor: pointBorderColors,
+                pointBorderWidth: pointBorderWidths,
+                pointRadius: pointRadii,
+                pointHoverRadius: pointHoverRadii,
                 fill: false,
                 tension: 0.2
             }]
@@ -1845,7 +2178,23 @@ function renderSentencesChart(sentences) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
+            plugins: { 
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const idx = context.dataIndex;
+                            const score = context.parsed.y;
+                            let baseLabel = `Wynik: ${score}`;
+                            const tp = turningPoints.find(t => t.index === idx);
+                            if (tp) {
+                                return [baseLabel, `⚡ ${tp.title}: ${tp.reason}`];
+                            }
+                            return baseLabel;
+                        }
+                    }
+                }
+            },
             scales: {
                 y: {
                     min: -1.0,
@@ -1860,6 +2209,51 @@ function renderSentencesChart(sentences) {
             }
         }
     });
+
+    // Render turning points list below chart
+    const listContainer = document.getElementById('timeline-turning-points');
+    if (listContainer) {
+        if (turningPoints && turningPoints.length > 0) {
+            listContainer.style.display = 'block';
+            listContainer.innerHTML = `
+                <div style="font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                    <span style="color: #d946ef;">⚡</span>
+                    <span>Punkty zwrotne w tekście:</span>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+                    ${turningPoints.map(tp => `
+                        <div class="glass-card" style="padding: 12px; border: 1px solid rgba(217, 70, 239, 0.25); background: rgba(217, 70, 239, 0.03); border-radius: 8px; cursor: pointer; transition: all 0.2s;" onclick="highlightSentence(${tp.index})" onmouseover="this.style.background='rgba(217, 70, 239, 0.08)';" onmouseout="this.style.background='rgba(217, 70, 239, 0.03)';">
+                            <div style="font-weight: 600; color: #d946ef; font-size: 13px; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between;">
+                                <span>⚡ ${tp.title}</span>
+                                <span style="font-size: 10px; color: var(--text-muted); background: rgba(217,70,239,0.1); padding: 2px 6px; border-radius: 20px;">Zdanie #${tp.index + 1}</span>
+                            </div>
+                            <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4;">${tp.reason}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        } else {
+            listContainer.style.display = 'none';
+        }
+    }
+}
+
+function highlightSentence(index) {
+    if (!sentencesChart) return;
+    
+    // Highlight node on graph by making it active in Chart.js
+    sentencesChart.setActiveElements([{
+        datasetIndex: 0,
+        index: index
+    }]);
+    
+    // Scroll window/view to the sentences-chart-card element smoothly
+    const element = document.getElementById('sentences-chart-card');
+    if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    
+    sentencesChart.update();
 }
 
 async function compareTexts() {
@@ -1971,6 +2365,38 @@ function showSentimentResults(data) {
         document.getElementById('llm-analysis-card').style.display = 'none';
     }
 
+    if (data.fake_detection) {
+        const fd = data.fake_detection;
+        const badge = document.getElementById('fake-verdict-badge');
+        badge.textContent = fd.verdict_label;
+        
+        // Reset styles
+        badge.style.background = '';
+        badge.style.border = '';
+        badge.style.color = '';
+        
+        if (fd.verdict === 'genuine') {
+            badge.style.background = 'rgba(16, 185, 129, 0.1)';
+            badge.style.border = '1px solid #10b981';
+            badge.style.color = '#10b981';
+        } else if (fd.verdict === 'suspicious') {
+            badge.style.background = 'rgba(245, 158, 11, 0.1)';
+            badge.style.border = '1px solid #f59e0b';
+            badge.style.color = '#f59e0b';
+        } else {
+            badge.style.background = 'rgba(239, 68, 68, 0.1)';
+            badge.style.border = '1px solid #ef4444';
+            badge.style.color = '#ef4444';
+        }
+        
+        document.getElementById('fake-confidence-bar').style.width = fd.confidence + '%';
+        document.getElementById('fake-confidence-val').textContent = fd.confidence + '%';
+        document.getElementById('fake-reasoning-text').textContent = fd.reasoning;
+        document.getElementById('fake-review-card').style.display = 'block';
+    } else {
+        document.getElementById('fake-review-card').style.display = 'none';
+    }
+
     renderWordHighlights(data.words);
     renderEmotions(data.emotions);
     renderStats(data.stats, 's-stats-grid', 's-top-words-section');
@@ -2066,6 +2492,7 @@ function showAIResults(data) {
         document.getElementById('ai-verdict-desc').textContent = 'Wymagane minimum 30 znaków';
         document.getElementById('ai-lang-badge').style.display = 'none';
         document.getElementById('ai-recommendations-card').style.display = 'none';
+        document.getElementById('ai-explanation-card').style.display = 'none';
         document.getElementById('ai-results').classList.add('show');
         return;
     }
@@ -2099,6 +2526,13 @@ function showAIResults(data) {
         document.getElementById('ai-lang-badge').style.display = 'inline-flex';
     } else {
         document.getElementById('ai-lang-badge').style.display = 'none';
+    }
+
+    if (data.ai_explanation) {
+        document.getElementById('ai-explanation-text').textContent = data.ai_explanation;
+        document.getElementById('ai-explanation-card').style.display = 'block';
+    } else {
+        document.getElementById('ai-explanation-card').style.display = 'none';
     }
 
     if (data.recommendations && data.recommendations.length > 0) {
@@ -2374,6 +2808,26 @@ async function analyzeBatch() {
 function showBatchResults(data) {
     const summary = data.summary;
     
+    // Store full reviews and reset chat history
+    loadedCsvReviews = data.full_reviews || [];
+    csvChatHistory = [];
+    
+    // Reset Chat UI
+    const chatContainer = document.getElementById('csv-chat-messages');
+    if (chatContainer) {
+        chatContainer.innerHTML = `
+            <div class="chat-bubble model" style="align-self: flex-start; max-width: 85%; padding: 12px 16px; background: rgba(124, 92, 252, 0.1); border-left: 4px solid var(--accent-1); border-radius: 4px 16px 16px 16px; color: var(--text-primary); font-size: 13px; line-height: 1.5;">
+                Cześć! Jestem Twoim inteligentnym asystentem biznesowym TextScope. Wyodrębniłem opinie z Twojego pliku CSV. 📈<br><br>
+                <strong>Możesz mnie zapytać na przykład o:</strong>
+                <ul style="margin: 8px 0 0 16px; padding: 0; list-style-type: disc; display: flex; flex-direction: column; gap: 4px;">
+                    <li><a href="#" onclick="setCsvChatPrompt('Co najbardziej irytuje klientów?'); return false;" style="color: var(--accent-1); text-decoration: none; font-weight: 500;">Co najbardziej irytuje klientów?</a></li>
+                    <li><a href="#" onclick="setCsvChatPrompt('Jakie są najczęstsze zalety i mocne strony produktu?'); return false;" style="color: var(--accent-1); text-decoration: none; font-weight: 500;">Jakie są najczęstsze zalety i mocne strony?</a></li>
+                    <li><a href="#" onclick="setCsvChatPrompt('Podsumuj ogólny ton opinii i napisz krótkie wnioski dla biznesu.'); return false;" style="color: var(--accent-1); text-decoration: none; font-weight: 500;">Podsumuj ogólny ton i wyciągnij wnioski biznesowe.</a></li>
+                </ul>
+            </div>
+        `;
+    }
+    
     document.getElementById('b-total-reviews').textContent = summary.total_reviews;
     document.getElementById('b-avg-sentiment').textContent = summary.average_sentiment;
     
@@ -2568,8 +3022,145 @@ document.getElementById('text-input').addEventListener('keydown', function(e) {
 });
 
 const style = document.createElement('style');
-style.textContent = `@keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-8px)} 75%{transform:translateX(8px)} }`;
+style.textContent = `
+@keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-8px)} 75%{transform:translateX(8px)} }
+@keyframes bounce {
+    0%, 80%, 100% { transform: scale(0); }
+    40% { transform: scale(1.0); }
+}
+`;
 document.head.appendChild(style);
+
+function setCsvChatPrompt(prompt) {
+    const input = document.getElementById('csv-chat-input');
+    if (input) {
+        input.value = prompt;
+        input.focus();
+    }
+}
+
+function handleCsvChatKeydown(event) {
+    if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        sendCsvChatMessage();
+    }
+}
+
+async function sendCsvChatMessage() {
+    const input = document.getElementById('csv-chat-input');
+    const sendBtn = document.getElementById('csv-chat-send-btn');
+    const container = document.getElementById('csv-chat-messages');
+    
+    if (!input || !sendBtn || !container) return;
+    
+    const message = input.value.trim();
+    if (!message) return;
+    
+    // Clear input
+    input.value = '';
+    
+    // Append User Message to UI
+    container.innerHTML += `
+        <div class="chat-bubble user" style="align-self: flex-end; max-width: 85%; padding: 12px 16px; background: var(--accent-gradient-soft); border: 1px solid var(--accent-2); border-radius: 16px 16px 4px 16px; color: var(--text-primary); font-size: 13px; line-height: 1.5; margin-left: auto;">
+            ${escapeHtml(message)}
+        </div>
+    `;
+    container.scrollTop = container.scrollHeight;
+    
+    // Append Shimmer/Typing Indicator
+    const typingId = 'csv-chat-typing-indicator';
+    container.innerHTML += `
+        <div id="${typingId}" class="chat-bubble model" style="align-self: flex-start; max-width: 85%; padding: 12px 16px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 4px 16px 16px 16px; color: var(--text-secondary); font-size: 13px; display: flex; align-items: center; gap: 4px;">
+            <span style="font-style: italic;">Skanowanie opinii i generowanie analizy...</span>
+            <div style="display: inline-flex; gap: 3px; align-items: center; margin-left: 6px;">
+                <span class="dot" style="width: 6px; height: 6px; background: var(--accent-1); border-radius: 50%; animation: bounce 1.4s infinite ease-in-out both;"></span>
+                <span class="dot" style="width: 6px; height: 6px; background: var(--accent-1); border-radius: 50%; animation: bounce 1.4s infinite ease-in-out both; animation-delay: 0.2s;"></span>
+                <span class="dot" style="width: 6px; height: 6px; background: var(--accent-1); border-radius: 50%; animation: bounce 1.4s infinite ease-in-out both; animation-delay: 0.4s;"></span>
+            </div>
+        </div>
+    `;
+    container.scrollTop = container.scrollHeight;
+    
+    // Disable inputs
+    input.disabled = true;
+    sendBtn.disabled = true;
+    
+    try {
+        const res = await fetch('/chat_batch', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                message: message,
+                reviews: loadedCsvReviews,
+                history: csvChatHistory
+            })
+        });
+        const data = await res.json();
+        
+        // Remove typing indicator
+        const indicator = document.getElementById(typingId);
+        if (indicator) indicator.remove();
+        
+        if (data.error) {
+            container.innerHTML += `
+                <div class="chat-bubble model" style="align-self: flex-start; max-width: 85%; padding: 12px 16px; background: rgba(248,113,113,0.1); border-left: 4px solid var(--negative); border-radius: 4px 16px 16px 16px; color: var(--negative); font-size: 13px;">
+                    ⚠️ Błąd: ${escapeHtml(data.error)}
+                </div>
+            `;
+        } else {
+            // Render Gemini Response with Markdown-like bold & line breaks
+            const formattedReply = formatMarkdownReply(data.reply);
+            container.innerHTML += `
+                <div class="chat-bubble model" style="align-self: flex-start; max-width: 85%; padding: 12px 16px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 4px 16px 16px 16px; color: var(--text-primary); font-size: 13px; line-height: 1.5;">
+                    ${formattedReply}
+                </div>
+            `;
+            
+            // Save to local conversational history
+            csvChatHistory.push({ role: 'user', content: message });
+            csvChatHistory.push({ role: 'model', content: data.reply });
+        }
+        
+    } catch (e) {
+        const indicator = document.getElementById(typingId);
+        if (indicator) indicator.remove();
+        container.innerHTML += `
+            <div class="chat-bubble model" style="align-self: flex-start; max-width: 85%; padding: 12px 16px; background: rgba(248,113,113,0.1); border-left: 4px solid var(--negative); border-radius: 4px 16px 16px 16px; color: var(--negative); font-size: 13px;">
+                ⚠️ Błąd połączenia: ${escapeHtml(e.message)}
+            </div>
+        `;
+    } finally {
+        input.disabled = false;
+        sendBtn.disabled = false;
+        input.focus();
+        container.scrollTop = container.scrollHeight;
+    }
+}
+
+// Helpers for escaping HTML and quick formatting
+function escapeHtml(str) {
+    return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+}
+
+function formatMarkdownReply(text) {
+    // Escape HTML first
+    let formatted = escapeHtml(text);
+    
+    // bold: **text**
+    formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    
+    // bullet list: - item or * item
+    formatted = formatted.replace(/^\s*[-*]\s+(.*?)$/gm, '<li style="margin-left: 12px;">$1</li>');
+    
+    // headers: ### Header
+    formatted = formatted.replace(/^### (.*?)$/gm, '<h4 style="color:#d946ef; margin: 12px 0 6px 0; font-size:14px; font-weight:700;">$1</h4>');
+    formatted = formatted.replace(/^## (.*?)$/gm, '<h3 style="color:var(--accent-1); margin: 16px 0 8px 0; font-size:15px; font-weight:700;">$1</h3>');
+    
+    // line breaks
+    formatted = formatted.replace(/\n/g, '<br>');
+    
+    return formatted;
+}
 </script>
 
 </body>

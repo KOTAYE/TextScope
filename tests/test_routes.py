@@ -7,7 +7,7 @@ import io
 import sys
 import os
 import pytest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -182,3 +182,27 @@ def test_generate_example_route(client):
     data = res.get_json()
     assert 'text' in data
     assert 'source' in data
+
+def test_rewrite_route(client):
+    with patch('app.requests.post') as mock_post:
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "candidates": [{
+                "content": {
+                    "parts": [{
+                        "text": "To jest pyszne danie."
+                    }]
+                }
+            }]
+        }
+        mock_post.return_value = mock_response
+
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "test_key"}):
+            res = client.post('/rewrite', json={
+                'text': 'To danie jest bardzo dobre.',
+                'tone': 'human'
+            })
+            assert res.status_code == 200
+            data = res.get_json()
+            assert data['rewritten_text'] == "To jest pyszne danie."
