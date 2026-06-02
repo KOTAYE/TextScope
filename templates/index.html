@@ -1,0 +1,2117 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TextScope — Analizator tekstu</title>
+    <meta name="description" content="Inteligentna analiza tonalności tekstu i detekcja tekstu AI">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #0f0f1a;
+            --bg-secondary: #1a1a2e;
+            --bg-card: rgba(30, 30, 50, 0.7);
+            --bg-card-hover: rgba(40, 40, 65, 0.8);
+            --border-color: rgba(255, 255, 255, 0.06);
+            --text-primary: #e8e8f0;
+            --text-secondary: #9595b0;
+            --text-muted: #6565805a;
+            --accent-1: #7c5cfc;
+            --accent-2: #c84cff;
+            --accent-3: #ff6b9d;
+            --accent-gradient: linear-gradient(135deg, #7c5cfc, #c84cff, #ff6b9d);
+            --accent-gradient-soft: linear-gradient(135deg, rgba(124,92,252,0.15), rgba(200,76,255,0.15));
+            --positive: #4ade80;
+            --negative: #f87171;
+            --neutral: #facc15;
+            --shadow-lg: 0 20px 60px rgba(0,0,0,0.4);
+            --shadow-glow: 0 0 40px rgba(124,92,252,0.15);
+            --radius: 16px;
+            --radius-sm: 10px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        .compare-toggle-btn:hover {
+            background: rgba(255,255,255,0.1) !important;
+            border-color: var(--accent-1) !important;
+            color: var(--accent-1) !important;
+        }
+        
+        .drag-drop-zone {
+            transition: all 0.3s ease;
+        }
+        .drag-drop-zone.dragover {
+            border-color: var(--accent-2) !important;
+            background: rgba(200,76,255,0.08) !important;
+            box-shadow: 0 0 20px rgba(200,76,255,0.1);
+        }
+        
+        .recommendation-item {
+            padding: 12px 16px;
+            border-radius: var(--radius-sm);
+            background: rgba(255,255,255,0.02);
+            border-left: 4px solid var(--accent-1);
+            font-size: 13px;
+            line-height: 1.5;
+            color: var(--text-primary);
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+        
+        .topic-item {
+            background: rgba(255,255,255,0.02);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            padding: 12px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            transition: all 0.2s ease;
+        }
+        .topic-item:hover {
+            border-color: rgba(255, 255, 255, 0.12);
+            background: rgba(255,255,255,0.03);
+        }
+        .topic-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+            font-size: 13px;
+        }
+        .topic-relevance {
+            font-size: 10px;
+            color: var(--accent-1);
+            background: var(--accent-gradient-soft);
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-weight: 700;
+        }
+        .topic-keywords {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+        .topic-keyword-chip {
+            font-size: 10px;
+            padding: 2px 6px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 4px;
+            color: var(--text-secondary);
+        }
+        
+        .export-btn:hover {
+            background: var(--accent-gradient) !important;
+            color: white !important;
+            box-shadow: 0 4px 15px rgba(124,92,252,0.25);
+            border-color: transparent !important;
+        }
+
+        .lang-badge {
+            transition: all 0.2s ease;
+        }
+        .lang-badge:hover {
+            background: rgba(255,255,255,0.12) !important;
+            color: var(--text-primary) !important;
+        }
+        
+        .batch-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            font-size: 13px;
+        }
+        .batch-table th, .batch-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border-color);
+            text-align: left;
+        }
+        .batch-table th {
+            font-weight: 600;
+            color: var(--text-secondary);
+            background: rgba(255,255,255,0.02);
+        }
+        .batch-table tr:hover td {
+            background: rgba(255,255,255,0.01);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .bg-effects {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            overflow: hidden;
+        }
+        .bg-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.3;
+            animation: float 20s ease-in-out infinite;
+        }
+        .bg-orb:nth-child(1) {
+            width: 500px; height: 500px;
+            background: var(--accent-1);
+            top: -10%; left: -5%;
+            animation-duration: 25s;
+        }
+        .bg-orb:nth-child(2) {
+            width: 400px; height: 400px;
+            background: var(--accent-2);
+            top: 50%; right: -10%;
+            animation-duration: 30s;
+            animation-delay: -5s;
+        }
+        .bg-orb:nth-child(3) {
+            width: 350px; height: 350px;
+            background: var(--accent-3);
+            bottom: -5%; left: 30%;
+            animation-duration: 22s;
+            animation-delay: -10s;
+        }
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            33% { transform: translate(30px, -40px) scale(1.05); }
+            66% { transform: translate(-20px, 30px) scale(0.95); }
+        }
+
+        .header {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            padding: 50px 20px 30px;
+        }
+        .header .logo {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        .header .logo-icon {
+            width: 48px; height: 48px;
+            background: var(--accent-gradient);
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            box-shadow: 0 8px 24px rgba(124,92,252,0.3);
+        }
+        .header h1 {
+            font-size: 32px;
+            font-weight: 800;
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .header .subtitle {
+            font-size: 15px;
+            color: var(--text-secondary);
+            font-weight: 400;
+            margin-top: 6px;
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 880px;
+            margin: 0 auto;
+            padding: 0 20px 40px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 24px;
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            padding: 5px;
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border-color);
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 13px 20px;
+            border: none;
+            background: transparent;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+            color: var(--text-secondary);
+            border-radius: 12px;
+            font-family: inherit;
+            letter-spacing: -0.01em;
+        }
+        .tab-btn:hover { color: var(--text-primary); background: rgba(255,255,255,0.04); }
+        .tab-btn.active {
+            background: var(--accent-gradient);
+            color: white;
+            box-shadow: 0 4px 20px rgba(124,92,252,0.35);
+        }
+
+        .card {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            padding: 28px;
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border-color);
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+        }
+        .card:hover {
+            border-color: rgba(124,92,252,0.15);
+            box-shadow: var(--shadow-glow);
+        }
+        .card-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 18px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .card-title .icon {
+            width: 32px; height: 32px;
+            background: var(--accent-gradient-soft);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 170px;
+            background: rgba(0,0,0,0.25);
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            padding: 16px;
+            font-size: 14px;
+            font-family: 'Inter', sans-serif;
+            color: var(--text-primary);
+            resize: vertical;
+            transition: all 0.3s ease;
+            outline: none;
+            line-height: 1.6;
+        }
+        textarea:focus {
+            border-color: var(--accent-1);
+            box-shadow: 0 0 0 3px rgba(124,92,252,0.15);
+        }
+        textarea::placeholder { color: rgba(150,150,180,0.4); }
+
+        .input-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 8px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        .shortcut-hint { opacity: 0.5; }
+        .shortcut-hint kbd {
+            background: rgba(255,255,255,0.08);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-family: inherit;
+        }
+
+        .examples { margin-top: 16px; }
+        .examples-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .example-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+        .example-chip {
+            padding: 7px 14px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.25s;
+            color: var(--text-secondary);
+            font-family: inherit;
+            font-weight: 500;
+        }
+        .example-chip:hover {
+            background: rgba(124,92,252,0.15);
+            border-color: var(--accent-1);
+            color: var(--text-primary);
+            transform: translateY(-1px);
+        }
+
+        .analyze-btn {
+            width: 100%;
+            padding: 15px;
+            background: var(--accent-gradient);
+            color: white;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            margin-top: 18px;
+            font-family: inherit;
+            letter-spacing: 0.02em;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+        .analyze-btn::before {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%; width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+            transition: left 0.5s;
+        }
+        .analyze-btn:hover::before { left: 100%; }
+        .analyze-btn:hover {
+            box-shadow: 0 8px 30px rgba(124,92,252,0.4);
+            transform: translateY(-2px);
+        }
+        .analyze-btn:active { transform: translateY(0) scale(0.98); }
+        .analyze-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .analyze-btn:disabled::before { display: none; }
+
+        .loading { display: none; text-align: center; padding: 50px 20px; }
+        .loading.show { display: block; animation: fadeIn 0.3s ease; }
+        .loader {
+            width: 48px; height: 48px;
+            border-radius: 50%;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--accent-1);
+            animation: spin 0.7s linear infinite;
+            margin: 0 auto 16px;
+        }
+        .loading-text { color: var(--text-secondary); font-size: 14px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(25px); } to { opacity: 1; transform: translateY(0); } }
+
+        .results { display: none; }
+        .results.show {
+            display: block;
+            animation: fadeInUp 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .big-result {
+            text-align: center;
+            padding: 30px 20px;
+        }
+        .big-emoji {
+            font-size: 72px;
+            margin-bottom: 8px;
+            animation: bounceIn 0.5s ease;
+        }
+        @keyframes bounceIn {
+            0% { transform: scale(0.3); opacity: 0; }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .big-category {
+            font-size: 28px;
+            font-weight: 800;
+            margin-bottom: 6px;
+        }
+        .big-category.positive { color: var(--positive); }
+        .big-category.negative { color: var(--negative); }
+        .big-category.neutral { color: var(--neutral); }
+        .big-score {
+            font-size: 14px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .sentiment-bar-wrap { margin: 24px 0; }
+        .bar-labels {
+            display: flex; justify-content: space-between;
+            font-size: 13px; font-weight: 600; margin-bottom: 8px;
+        }
+        .bar-labels .pos { color: var(--positive); }
+        .bar-labels .neg { color: var(--negative); }
+        .sentiment-bar {
+            height: 12px;
+            background: var(--negative);
+            border-radius: 6px;
+            overflow: hidden;
+            position: relative;
+        }
+        .sentiment-bar-fill {
+            height: 100%;
+            background: var(--positive);
+            border-radius: 6px;
+            transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+        .sentiment-bar-fill::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            animation: shimmer 2s infinite;
+        }
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+            gap: 12px;
+            margin-top: 20px;
+        }
+        .detail-card {
+            background: rgba(0,0,0,0.2);
+            border-radius: var(--radius-sm);
+            padding: 16px;
+            border: 1px solid var(--border-color);
+            transition: all 0.25s;
+        }
+        .detail-card:hover {
+            border-color: rgba(124,92,252,0.2);
+            transform: translateY(-2px);
+        }
+        .detail-card .label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
+        .detail-card .value {
+            font-size: 22px;
+            font-weight: 800;
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .word-highlight-section { margin-top: 8px; }
+        .word-highlight-box {
+            background: rgba(0,0,0,0.3);
+            border-radius: var(--radius-sm);
+            padding: 18px;
+            line-height: 2;
+            font-size: 14px;
+            border: 1px solid var(--border-color);
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .word-highlight-box::-webkit-scrollbar { width: 6px; }
+        .word-highlight-box::-webkit-scrollbar-track { background: transparent; }
+        .word-highlight-box::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+
+        .w-pos {
+            background: rgba(74,222,128,0.2);
+            color: #4ade80;
+            padding: 2px 4px;
+            border-radius: 4px;
+            font-weight: 600;
+            cursor: default;
+            transition: all 0.2s;
+        }
+        .w-pos:hover { background: rgba(74,222,128,0.35); }
+        .w-neg {
+            background: rgba(248,113,113,0.2);
+            color: #f87171;
+            padding: 2px 4px;
+            border-radius: 4px;
+            font-weight: 600;
+            cursor: default;
+            transition: all 0.2s;
+        }
+        .w-neg:hover { background: rgba(248,113,113,0.35); }
+
+        .highlight-legend {
+            display: flex; gap: 16px; margin-top: 12px; font-size: 12px;
+        }
+        .legend-item { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); }
+        .legend-dot {
+            width: 10px; height: 10px; border-radius: 50%;
+        }
+        .legend-dot.pos { background: var(--positive); }
+        .legend-dot.neg { background: var(--negative); }
+        .legend-dot.neu { background: var(--text-secondary); }
+
+        .emotions-section {
+            display: flex;
+            gap: 20px;
+            align-items: stretch;
+        }
+        .emotions-chart-wrap {
+            flex: 1;
+            min-height: 250px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .emotions-legend {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 10px;
+        }
+        .emotion-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            background: rgba(0,0,0,0.15);
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+        .emotion-item:hover { background: rgba(0,0,0,0.25); }
+        .emotion-emoji { font-size: 20px; }
+        .emotion-info { flex: 1; }
+        .emotion-name { font-size: 13px; font-weight: 600; }
+        .emotion-bar-bg {
+            width: 100%; height: 4px;
+            background: rgba(255,255,255,0.06);
+            border-radius: 2px; margin-top: 4px;
+        }
+        .emotion-bar-fg {
+            height: 100%; border-radius: 2px;
+            transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .emotion-value {
+            font-size: 13px; font-weight: 700; min-width: 35px;
+            text-align: right;
+        }
+
+        .ai-gauge-section {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 40px;
+            padding: 20px;
+        }
+        .gauge-wrap {
+            position: relative;
+            width: 200px;
+            height: 200px;
+        }
+        .gauge-canvas { width: 200px; height: 200px; }
+        .gauge-center {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+        }
+        .gauge-pct {
+            font-size: 44px;
+            font-weight: 900;
+            line-height: 1;
+        }
+        .gauge-pct.high { color: var(--negative); }
+        .gauge-pct.medium { color: var(--neutral); }
+        .gauge-pct.low { color: var(--positive); }
+        .gauge-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            font-weight: 600;
+        }
+        .ai-verdict-box { text-align: center; }
+        .ai-verdict-text {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .ai-verdict-desc {
+            font-size: 13px;
+            color: var(--text-secondary);
+            max-width: 200px;
+            line-height: 1.5;
+        }
+
+        .metric-row {
+            display: flex;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border-color);
+            gap: 12px;
+        }
+        .metric-row:last-child { border-bottom: none; }
+        .metric-name { font-size: 13px; color: var(--text-secondary); min-width: 160px; font-weight: 500; }
+        .metric-bar-outer { flex: 1; height: 8px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden; }
+        .metric-bar-inner { height: 100%; border-radius: 4px; transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1); }
+        .metric-val { font-size: 13px; font-weight: 700; min-width: 42px; text-align: right; }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 10px;
+        }
+        .stat-card {
+            text-align: center;
+            padding: 16px 10px;
+            background: rgba(0,0,0,0.2);
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-color);
+            transition: all 0.25s;
+        }
+        .stat-card:hover { border-color: rgba(124,92,252,0.2); }
+        .stat-val {
+            font-size: 24px;
+            font-weight: 800;
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .stat-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+            font-weight: 500;
+        }
+
+        .top-words { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+        .top-word-chip {
+            padding: 6px 14px;
+            background: var(--accent-gradient-soft);
+            border: 1px solid rgba(124,92,252,0.15);
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        .top-word-count {
+            font-weight: 400;
+            color: var(--text-secondary);
+            margin-left: 4px;
+        }
+
+        .note {
+            margin-top: 16px;
+            padding: 14px 18px;
+            background: rgba(250,204,21,0.06);
+            border: 1px solid rgba(250,204,21,0.15);
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            color: rgba(250,204,21,0.85);
+            line-height: 1.6;
+        }
+        .note strong { display: block; margin-bottom: 2px; }
+
+        .history-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            user-select: none;
+        }
+        .history-toggle .arrow {
+            transition: transform 0.3s;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        .history-toggle.open .arrow { transform: rotate(180deg); }
+        .history-list {
+            display: none;
+            margin-top: 14px;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+        .history-list.show { display: block; animation: fadeIn 0.3s ease; }
+        .history-item {
+            padding: 12px 14px;
+            background: rgba(0,0,0,0.15);
+            border-radius: 8px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+        .history-item:hover {
+            border-color: var(--accent-1);
+            background: rgba(124,92,252,0.08);
+        }
+        .history-item-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 4px;
+        }
+        .history-type {
+            font-size: 11px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.06em; color: var(--accent-1);
+        }
+        .history-time { font-size: 11px; color: var(--text-secondary); }
+        .history-text {
+            font-size: 13px; color: var(--text-secondary);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .history-empty {
+            text-align: center; padding: 20px;
+            color: var(--text-secondary); font-size: 13px;
+        }
+        .history-clear-btn {
+            font-size: 11px;
+            background: none;
+            border: 1px solid rgba(248,113,113,0.3);
+            color: var(--negative);
+            padding: 4px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .history-clear-btn:hover { background: rgba(248,113,113,0.1); }
+
+        .footer {
+            text-align: center;
+            padding: 30px 20px;
+            color: var(--text-secondary);
+            font-size: 12px;
+            position: relative;
+            z-index: 1;
+        }
+        .footer a { color: var(--accent-1); text-decoration: none; }
+
+        @media (max-width: 700px) {
+            .header h1 { font-size: 24px; }
+            .tabs { flex-direction: column; }
+            .emotions-section { flex-direction: column; }
+            .ai-gauge-section { flex-direction: column; gap: 20px; }
+            .detail-grid { grid-template-columns: 1fr 1fr; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 420px) {
+            .detail-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="bg-effects">
+    <div class="bg-orb"></div>
+    <div class="bg-orb"></div>
+    <div class="bg-orb"></div>
+</div>
+
+<header class="header">
+    <div class="logo">
+        <div class="logo-icon">🔬</div>
+        <h1>TextScope</h1>
+    </div>
+    <p class="subtitle">Inteligentna analiza tonalności i detekcja tekstu AI</p>
+</header>
+
+<div class="container">
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('sentiment')" id="tab-sentiment">
+            😊 Tonalność i emocje
+        </button>
+        <button class="tab-btn" onclick="switchTab('ai_detect')" id="tab-ai">
+            🤖 Detekcja AI
+        </button>
+        <button class="tab-btn" onclick="switchTab('batch')" id="tab-batch">
+            📊 Analiza zbiorcza (CSV)
+        </button>
+    </div>
+
+    <div class="card" id="input-card">
+        <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <div class="icon" id="input-icon">📝</div>
+                <span id="card-title-text">Analiza tonalności tekstu</span>
+            </div>
+            <button class="compare-toggle-btn" id="compare-toggle-btn" onclick="toggleCompareMode()" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px 12px; border-radius: var(--radius-sm); cursor: pointer; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; transition: all 0.2s;">
+                ⚖️ Porównaj teksty
+            </button>
+        </div>
+
+        <div id="single-textarea-wrap">
+            <textarea id="text-input" placeholder="Wstaw tekst do analizy...&#10;&#10;Na przykład, opinia z Google Maps, artykuł lub dowolny tekst."></textarea>
+        </div>
+        
+        <div id="compare-textareas-wrap" style="display: none; gap: 16px; margin-bottom: 12px; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 280px; display: flex; flex-direction: column; gap: 8px;">
+                <label style="font-size: 12px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Tekst 1 (Oryginał / Wersja A)</label>
+                <textarea id="text-input-1" placeholder="Wpisz pierwszy tekst do porównania..." style="height: 180px;"></textarea>
+            </div>
+            <div style="flex: 1; min-width: 280px; display: flex; flex-direction: column; gap: 8px;">
+                <label style="font-size: 12px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Tekst 2 (Wersja alternatywna / Wersja B)</label>
+                <textarea id="text-input-2" placeholder="Wpisz drugi tekst do porównania..." style="height: 180px;"></textarea>
+            </div>
+        </div>
+
+        <div class="input-meta" id="input-meta-wrap">
+            <span><span id="word-counter">0</span> słów · <span id="char-counter">0</span> znaków</span>
+            <span class="shortcut-hint"><kbd>Ctrl</kbd> + <kbd>Enter</kbd></span>
+        </div>
+
+        <div class="examples" id="examples-sentiment">
+            <div class="examples-label">Wypróbuj przykład</div>
+            <div class="example-chips">
+                <button class="example-chip" onclick="setExample('pos')">👍 Pozytywna opinia</button>
+                <button class="example-chip" onclick="setExample('neg')">👎 Negatywna opinia</button>
+                <button class="example-chip" onclick="setExample('mixed')">🤔 Mieszana opinia</button>
+                <button class="example-chip" onclick="setExample('neutral')">😐 Neutralny</button>
+            </div>
+        </div>
+
+        <div class="examples" id="examples-ai" style="display:none;">
+            <div class="examples-label">Wypróbuj przykład</div>
+            <div class="example-chips">
+                <button class="example-chip" onclick="setExample('ai1')">🤖 Tekst ChatGPT</button>
+                <button class="example-chip" onclick="setExample('ai2')">🤖 Formalny AI</button>
+                <button class="example-chip" onclick="setExample('human1')">👤 Tekst człowieka</button>
+                <button class="example-chip" onclick="setExample('human2')">👤 Nieformalny</button>
+            </div>
+        </div>
+
+        <button class="analyze-btn" onclick="analyzeText()" id="analyze-btn">
+            ✨ Analizuj tekst
+        </button>
+    </div>
+
+    <div class="card" id="batch-card" style="display: none;">
+        <div class="card-title">
+            <div class="icon">📊</div>
+            <span>Analiza zbiorcza opinii z pliku CSV</span>
+        </div>
+        <p style="color: var(--text-secondary); font-size: 13px; margin-bottom: 18px; line-height: 1.6;">
+            Prześlij plik CSV z opiniami (np. wyeksportowanymi z Google Maps), aby automatycznie zanalizować je pod kątem tonacji i emocji oraz wygenerować zintegrowany raport statystyczny. Pierwsza kolumna powinna zawierać treść opinii. Nagłówek zostanie pominięty.
+        </p>
+        
+        <div class="drag-drop-zone" id="csv-drag-drop" onclick="triggerFileInput()" style="border: 2px dashed rgba(124,92,252,0.3); border-radius: var(--radius); padding: 40px 20px; text-align: center; cursor: pointer; transition: all 0.3s; background: rgba(0,0,0,0.15);">
+            <div style="font-size: 40px; margin-bottom: 12px;">📁</div>
+            <div style="font-size: 15px; font-weight: 600; color: var(--text-primary); margin-bottom: 6px;">Przeciągnij i upuść plik CSV tutaj</div>
+            <div style="font-size: 12px; color: var(--text-secondary);">lub kliknij, aby wybrać z komputera</div>
+            <input type="file" id="csv-file-input" accept=".csv" style="display: none;" onchange="handleFileSelect(event)">
+        </div>
+        
+        <div id="selected-file-info" style="display: none; align-items: center; justify-content: space-between; margin-top: 16px; padding: 12px 16px; background: rgba(124,92,252,0.08); border: 1px solid rgba(124,92,252,0.2); border-radius: var(--radius-sm);">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 20px;">📄</span>
+                <div>
+                     <div id="file-name" style="font-size: 13px; font-weight: 600; color: var(--text-primary);">opinie.csv</div>
+                     <div id="file-size" style="font-size: 11px; color: var(--text-secondary);">0 KB</div>
+                </div>
+            </div>
+            <button onclick="removeSelectedFile()" style="background: transparent; border: none; color: var(--negative); cursor: pointer; font-size: 13px; font-weight: 600;">Usuń plik</button>
+        </div>
+        
+        <button class="analyze-btn" id="analyze-batch-btn" onclick="analyzeBatch()" disabled>
+            ✨ Rozpocznij analizę zbiorczą
+        </button>
+    </div>
+
+    <div class="loading" id="loading">
+        <div class="loader"></div>
+        <div class="loading-text">Analizujemy tekst...</div>
+    </div>
+
+    <div class="results" id="sentiment-results">
+        
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 14px;">
+            <button class="export-btn" id="s-export-btn" onclick="exportReport('sentiment')" style="background: rgba(124,92,252,0.1); border: 1px solid var(--accent-1); color: var(--text-primary); padding: 8px 16px; border-radius: var(--radius-sm); cursor: pointer; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; transition: all 0.2s;">
+                📄 Generuj raport PDF / HTML
+            </button>
+        </div>
+
+        <div class="card">
+            <div class="big-result" style="position: relative;">
+                <div class="big-emoji" id="s-emoji">😊</div>
+                <div class="big-category" id="s-category">Pozytywny</div>
+                <div class="big-score" id="s-score-text">Wynik łączony: 0.000</div>
+                
+                <div class="lang-badge" id="s-lang-badge" style="margin-top: 12px; display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; background: rgba(255,255,255,0.04); border: 1px solid var(--border-color); border-radius: 20px; font-size: 11px; font-weight: 600; color: var(--text-secondary);">
+                    🌐 Język: <span id="s-lang-val">—</span>
+                </div>
+            </div>
+
+            <div class="sentiment-bar-wrap">
+                <div class="bar-labels">
+                    <span class="pos">😊 Pozytywny: <strong id="s-pos-pct">0%</strong></span>
+                    <span class="neg">😠 Negatywny: <strong id="s-neg-pct">0%</strong></span>
+                </div>
+                <div class="sentiment-bar">
+                    <div class="sentiment-bar-fill" id="s-bar-fill" style="width:50%"></div>
+                </div>
+            </div>
+
+            <div class="detail-grid">
+                <div class="detail-card">
+                    <div class="label">VADER Score</div>
+                    <div class="value" id="s-vader">0.000</div>
+                </div>
+                <div class="detail-card">
+                    <div class="label">TextBlob Polarity</div>
+                    <div class="value" id="s-textblob">0.000</div>
+                </div>
+                <div class="detail-card">
+                    <div class="label">Subiektywność</div>
+                    <div class="value" id="s-subjectivity">0%</div>
+                </div>
+                <div class="detail-card">
+                    <div class="label">Łączony</div>
+                    <div class="value" id="s-combined">0.000</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">
+                <div class="icon">🎨</div>
+                <span>Podświetlanie słów</span>
+            </div>
+            <div class="word-highlight-box" id="word-highlight-box"></div>
+            <div class="highlight-legend">
+                <div class="legend-item"><span class="legend-dot pos"></span> Pozytywne</div>
+                <div class="legend-item"><span class="legend-dot neg"></span> Negatywne</div>
+                <div class="legend-item"><span class="legend-dot neu"></span> Neutralne</div>
+            </div>
+        </div>
+
+        <div class="card" id="s-topics-card" style="display:none;">
+            <div class="card-title">
+                <div class="icon">🏷️</div>
+                <span>Wykryta tematyka opinii</span>
+            </div>
+            <p style="color: var(--text-secondary); font-size: 12px; margin-bottom: 14px;">
+                Automatycznie sklasyfikowane wątki w tekście na podstawie dopasowania słów kluczowych:
+            </p>
+            <div id="topics-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px;">
+                
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">
+                <div class="icon">🎭</div>
+                <span>Analiza emocji</span>
+            </div>
+            <div class="emotions-section">
+                <div class="emotions-chart-wrap">
+                    <canvas id="emotions-chart" width="260" height="260"></canvas>
+                </div>
+                <div class="emotions-legend" id="emotions-legend"></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">
+                <div class="icon">📊</div>
+                <span>Statystyka tekstu</span>
+            </div>
+            <div class="stats-grid" id="s-stats-grid"></div>
+            <div id="s-top-words-section" style="margin-top:16px;"></div>
+        </div>
+
+        <div class="card" id="s-recommendations-card" style="display:none;">
+            <div class="card-title">
+                <div class="icon">💡</div>
+                <span>Inteligentne wskazówki i rekomendacje</span>
+            </div>
+            <div class="recommendations-list" id="s-recommendations-list" style="display: flex; flex-direction: column; gap: 10px;">
+                
+            </div>
+        </div>
+
+        <div class="note">
+            <strong>⚠️ Uwaga:</strong>
+            Analiza działa najlepiej z tekstem w języku angielskim (VADER + TextBlob są zoptymalizowane dla English).
+            Dla innych języków wyniki mogą być mniej dokładne.
+        </div>
+    </div>
+
+    <div class="results" id="ai-results">
+        
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 14px;">
+            <button class="export-btn" id="ai-export-btn" onclick="exportReport('ai_detect')" style="background: rgba(124,92,252,0.1); border: 1px solid var(--accent-1); color: var(--text-primary); padding: 8px 16px; border-radius: var(--radius-sm); cursor: pointer; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; transition: all 0.2s;">
+                📄 Generuj raport PDF / HTML
+            </button>
+        </div>
+
+        <div class="card">
+            <div class="card-title">
+                <div class="icon">🤖</div>
+                <span>Wynik sprawdzenia</span>
+            </div>
+            <div class="ai-gauge-section">
+                <div class="gauge-wrap">
+                    <canvas id="ai-gauge" class="gauge-canvas" width="200" height="200"></canvas>
+                    <div class="gauge-center">
+                        <div class="gauge-pct" id="ai-pct-text">0%</div>
+                        <div class="gauge-label">prawdopodobieństwo AI</div>
+                    </div>
+                </div>
+                <div class="ai-verdict-box">
+                    <div class="ai-verdict-text" id="ai-verdict">—</div>
+                    <div class="ai-verdict-desc" id="ai-verdict-desc">Wstaw tekst do analizy</div>
+                    
+                    <div class="lang-badge" id="ai-lang-badge" style="margin-top: 12px; display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; background: rgba(255,255,255,0.04); border: 1px solid var(--border-color); border-radius: 20px; font-size: 11px; font-weight: 600; color: var(--text-secondary);">
+                        🌐 Język: <span id="ai-lang-val">—</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sentiment-bar-wrap" style="margin-top:0;">
+                <div class="bar-labels">
+                    <span class="pos">👤 Człowiek: <strong id="ai-human-pct">0%</strong></span>
+                    <span class="neg">🤖 AI: <strong id="ai-ai-pct">0%</strong></span>
+                </div>
+                <div class="sentiment-bar" style="background: var(--negative);">
+                    <div class="sentiment-bar-fill" id="ai-bar-fill" style="width:50%; background: var(--positive);"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">
+                <div class="icon">📐</div>
+                <span>Szczegółowe metryki</span>
+            </div>
+            <div id="ai-metrics-list"></div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">
+                <div class="icon">📊</div>
+                <span>Statystyka tekstu</span>
+            </div>
+            <div class="stats-grid" id="ai-stats-grid"></div>
+            <div id="ai-top-words-section" style="margin-top:16px;"></div>
+        </div>
+
+        <div class="card" id="ai-recommendations-card" style="display:none;">
+            <div class="card-title">
+                <div class="icon">💡</div>
+                <span>Rekomendacje dotyczące stylu</span>
+            </div>
+            <div class="recommendations-list" id="ai-recommendations-list" style="display: flex; flex-direction: column; gap: 10px;">
+                
+            </div>
+        </div>
+
+        <div class="note">
+            <strong>⚠️ Uwaga:</strong>
+            Analiza opiera się na metodach heurystycznych (statystycznych) i nie jest w 100% dokładna.
+            Wyniki stanowią przybliżoną ocenę na podstawie cech tekstu.
+        </div>
+    </div>
+
+    <div class="results" id="compare-results" style="display:none;">
+        <div class="card">
+            <div class="card-title">
+                <div class="icon">⚖️</div>
+                <span>Podsumowanie porównania</span>
+            </div>
+            <div class="detail-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
+                <div class="detail-card">
+                    <div class="label">Różnica tonacji (A - B)</div>
+                    <div class="value" id="comp-sent-diff">0.000</div>
+                </div>
+                <div class="detail-card">
+                    <div class="label">Różnica prawdp. AI (A - B)</div>
+                    <div class="value" id="comp-ai-diff">0%</div>
+                </div>
+                <div class="detail-card">
+                    <div class="label">Różnica słów (A - B)</div>
+                    <div class="value" id="comp-len-diff">0</div>
+                </div>
+                <div class="detail-card">
+                    <div class="label">Czy ta sama język?</div>
+                    <div class="value" id="comp-lang-same">—</div>
+                </div>
+            </div>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; margin-bottom: 20px;">
+            
+            <div>
+                <h3 style="margin-bottom: 12px; color: var(--accent-1); display: flex; align-items: center; gap: 8px; font-size: 16px;">
+                    <span>Oryginał (Wersja A)</span>
+                </h3>
+                
+                <div class="card" style="padding: 20px; margin-bottom: 12px;">
+                    <div style="font-size:12px; color:var(--text-secondary); text-transform:uppercase; font-weight:600; margin-bottom:8px;">Tonalność</div>
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+                        <span id="comp1-s-emoji" style="font-size:24px;">😊</span>
+                        <strong id="comp1-s-cat" style="font-size:16px;">Pozytywny</strong>
+                        <span id="comp1-s-score" style="color:var(--text-secondary); font-size:12px;">(0.000)</span>
+                    </div>
+                    <div style="font-size:12px; color:var(--text-secondary);">
+                        Detekcja AI: <strong id="comp1-ai-pct" style="color:var(--text-primary)">0% AI</strong>
+                    </div>
+                </div>
+                
+                <div class="card" style="padding: 20px; margin-bottom: 12px;">
+                    <div style="font-size:12px; color:var(--text-secondary); text-transform:uppercase; font-weight:600; margin-bottom:8px;">Statystyka</div>
+                    <div class="stats-grid" id="comp1-stats" style="grid-template-columns: 1fr 1fr; gap: 6px;"></div>
+                </div>
+                
+                <div class="card" style="padding: 20px; margin-bottom: 12px;">
+                    <div style="font-size:12px; color:var(--text-secondary); text-transform:uppercase; font-weight:600; margin-bottom:8px;">Wątki</div>
+                    <div id="comp1-topics" style="display:flex; flex-wrap:wrap; gap:4px;">—</div>
+                </div>
+                
+                <div class="card" style="padding: 20px; margin-bottom: 12px;">
+                    <div style="font-size:12px; color:var(--text-secondary); text-transform:uppercase; font-weight:600; margin-bottom:8px;">Wskazówki</div>
+                    <div id="comp1-recs" style="display:flex; flex-direction:column; gap:6px;">—</div>
+                </div>
+            </div>
+            
+            <div>
+                <h3 style="margin-bottom: 12px; color: var(--accent-2); display: flex; align-items: center; gap: 8px; font-size: 16px;">
+                    <span>Alternatywa (Wersja B)</span>
+                </h3>
+                
+                <div class="card" style="padding: 20px; margin-bottom: 12px;">
+                    <div style="font-size:12px; color:var(--text-secondary); text-transform:uppercase; font-weight:600; margin-bottom:8px;">Tonalność</div>
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+                        <span id="comp2-s-emoji" style="font-size:24px;">😊</span>
+                        <strong id="comp2-s-cat" style="font-size:16px;">Pozytywny</strong>
+                        <span id="comp2-s-score" style="color:var(--text-secondary); font-size:12px;">(0.000)</span>
+                    </div>
+                    <div style="font-size:12px; color:var(--text-secondary);">
+                        Detekcja AI: <strong id="comp2-ai-pct" style="color:var(--text-primary)">0% AI</strong>
+                    </div>
+                </div>
+                
+                <div class="card" style="padding: 20px; margin-bottom: 12px;">
+                    <div style="font-size:12px; color:var(--text-secondary); text-transform:uppercase; font-weight:600; margin-bottom:8px;">Statystyka</div>
+                    <div class="stats-grid" id="comp2-stats" style="grid-template-columns: 1fr 1fr; gap: 6px;"></div>
+                </div>
+                
+                <div class="card" style="padding: 20px; margin-bottom: 12px;">
+                    <div style="font-size:12px; color:var(--text-secondary); text-transform:uppercase; font-weight:600; margin-bottom:8px;">Wątki</div>
+                    <div id="comp2-topics" style="display:flex; flex-wrap:wrap; gap:4px;">—</div>
+                </div>
+                
+                <div class="card" style="padding: 20px; margin-bottom: 12px;">
+                    <div style="font-size:12px; color:var(--text-secondary); text-transform:uppercase; font-weight:600; margin-bottom:8px;">Wskazówki</div>
+                    <div id="comp2-recs" style="display:flex; flex-direction:column; gap:6px;">—</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="results" id="batch-results" style="display:none;">
+        
+        <div class="card">
+            <div class="card-title">
+                <div class="icon">📊</div>
+                <span>Podsumowanie analizy zbiorczej</span>
+            </div>
+            
+            <div class="detail-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 24px;">
+                <div class="detail-card">
+                    <div class="label">Wszystkich opinii</div>
+                    <div class="value" id="b-total-reviews">0</div>
+                </div>
+                <div class="detail-card">
+                    <div class="label">Średni sentyment</div>
+                    <div class="value" id="b-avg-sentiment">0.000</div>
+                </div>
+                <div class="detail-card">
+                    <div class="label">Rozkład opinii</div>
+                    <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px; display: flex; flex-direction: column; gap: 3px;">
+                        <span>🟢 Pozytywne: <strong id="b-dist-pos" style="color:var(--positive)">0</strong></span>
+                        <span>🟡 Neutralne: <strong id="b-dist-neu" style="color:var(--neutral)">0</strong></span>
+                        <span>🔴 Negatywne: <strong id="b-dist-neg" style="color:var(--negative)">0</strong></span>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 12px; margin: 20px 0;">
+                <div style="width: 220px; height: 220px; position: relative;">
+                    <canvas id="batch-chart" width="220" height="220"></canvas>
+                </div>
+                <div style="font-size: 12px; color: var(--text-secondary); font-weight: 500;">Wizualizacja rozkładu tonacji opinii</div>
+            </div>
+        </div>
+        
+        <div class="card" style="overflow-x: auto;">
+            <div class="card-title">
+                <div class="icon">📝</div>
+                <span>Wyniki szczegółowe opinii</span>
+            </div>
+            <table class="batch-table">
+                <thead>
+                    <tr>
+                        <th style="width: 60px;">Wiersz</th>
+                        <th>Treść opinii (fragment)</th>
+                        <th style="width: 100px;">Język</th>
+                        <th style="width: 120px;">Dominująca emocja</th>
+                        <th style="width: 120px;">Ocena tonacji</th>
+                        <th style="width: 80px;">Wynik</th>
+                    </tr>
+                </thead>
+                <tbody id="batch-table-body">
+                    
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card" style="margin-top: 10px;">
+        <div class="history-toggle" id="history-toggle" onclick="toggleHistory()">
+            <div class="card-title" style="margin-bottom:0;">
+                <div class="icon">🕐</div>
+                <span>Historia analiz</span>
+            </div>
+            <span class="arrow">▼</span>
+        </div>
+        <div class="history-list" id="history-list"></div>
+    </div>
+
+</div>
+
+<footer class="footer">
+</footer>
+
+<script>
+
+let currentTab = 'sentiment';
+let emotionsChart = null;
+let batchChart = null;
+let isCompareMode = false;
+let selectedFile = null;
+let lastAnalyzedData = null;
+
+const examples = {
+    pos: "This restaurant is absolutely amazing! The food was incredibly delicious, and the staff was so friendly and welcoming. I had the best pasta I've ever tasted. The atmosphere was warm and cozy with beautiful decorations. Our waiter was attentive and made great recommendations. We'll definitely be coming back every week! Highly recommend to everyone looking for an unforgettable dining experience.",
+    neg: "Terrible experience, worst restaurant ever. The food was cold and tasteless, the waiter was extremely rude and completely ignored us for 40 minutes. When we finally got our order, it was wrong! The place was filthy and the bathrooms were disgusting. Way overpriced for such garbage quality. Never coming back. Save your money and avoid this disaster at all costs!",
+    mixed: "The food was quite good and the presentation was beautiful, but the service was slow and the waiter seemed annoyed. The atmosphere was nice with good music, though the tables were a bit too close together. Prices are reasonable for the quality. I'd probably come back but only for lunch when it's less crowded. Not bad, not great - just okay overall.",
+    neutral: "The restaurant is located at 42 Main Street, next to the post office. They serve Italian and Mediterranean cuisine. The menu includes pasta, pizza, salads, and seafood. Opening hours are Monday to Saturday, 11am to 10pm. Sunday they are closed. They accept both cash and credit cards. Parking is available behind the building.",
+    ai1: "Artificial intelligence has emerged as one of the most transformative technologies of the 21st century, fundamentally reshaping how we approach complex challenges across numerous sectors. Its applications span healthcare, finance, education, and transportation, offering unprecedented opportunities for innovation and efficiency. Furthermore, the integration of machine learning algorithms with big data analytics has enabled organizations to derive meaningful insights from vast datasets. It is important to note that while AI offers tremendous potential, it also raises significant ethical considerations regarding privacy, algorithmic bias, and the future of employment. Consequently, policymakers and technologists must collaborate to establish robust frameworks that ensure the responsible development and deployment of AI systems. Moreover, the democratization of AI tools has made these capabilities increasingly accessible to smaller organizations and individual developers.",
+    ai2: "The implementation of sustainable energy solutions represents a critical imperative for addressing climate change in the contemporary era. Solar and wind power technologies have experienced remarkable advancements in recent years, resulting in significant cost reductions and improved efficiency. Additionally, the development of energy storage systems has enhanced the reliability of renewable energy sources. It should be noted that government policies and incentives play a crucial role in accelerating the transition to clean energy. Furthermore, the growing awareness among consumers regarding environmental sustainability has driven increased demand for green energy alternatives. In conclusion, a comprehensive approach combining technological innovation, policy support, and public engagement is essential for achieving our climate goals.",
+    human1: "ok so i went to this new coffee place downtown and honestly?? it was kinda mid lol. like the latte was fine i guess but nothing special... waited like 15 mins which was annoying af. the vibes were cool tho ngl, nice playlist and aesthetic interior. might go back if im around but wouldnt go out of my way ya know? also their wifi was SO slow which is a dealbreaker for me cuz i need to work. oh and the barista was super nice so thats a plus at least!! 7/10 maybe",
+    human2: "just finished watching that new movie everyone's been talking about and WOW. ok where do i even start. the first hour was kinda slow tbh but then it picks up and holy crap the plot twist!! did NOT see that coming. my friend called it tho lol she always guesses everything. the acting was phenomenal especially the lead actress - she made me cry like 3 times no joke. soundtrack was fire too. only complaint is it was like 3 hours long and my back was killing me haha. but yeah 9/10 would recommend go see it!!"
+};
+
+const EMOTION_COLORS = {
+    joy: '#4ade80',
+    anger: '#f87171',
+    sadness: '#60a5fa',
+    fear: '#c084fc',
+    surprise: '#facc15',
+    disgust: '#34d399'
+};
+const EMOTION_EMOJIS = { joy:'😄', anger:'😡', sadness:'😢', fear:'😨', surprise:'😲', disgust:'🤢' };
+const EMOTION_NAMES = { joy:'Radość', anger:'Złość', sadness:'Smutek', fear:'Strach', surprise:'Zaskoczenie', disgust:'Obrzydzenie' };
+const FLAG_MAP = { en: '🇬🇧', pl: '🇵🇱', uk: '🇺🇦' };
+
+function switchTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    
+    let activeTabId = 'tab-sentiment';
+    if (tab === 'ai_detect') activeTabId = 'tab-ai';
+    else if (tab === 'batch') activeTabId = 'tab-batch';
+    
+    document.getElementById(activeTabId).classList.add('active');
+
+    document.getElementById('sentiment-results').classList.remove('show');
+    document.getElementById('ai-results').classList.remove('show');
+    document.getElementById('compare-results').style.display = 'none';
+    document.getElementById('batch-results').style.display = 'none';
+
+    if (tab === 'batch') {
+        document.getElementById('input-card').style.display = 'none';
+        document.getElementById('batch-card').style.display = '';
+    } else {
+        document.getElementById('input-card').style.display = '';
+        document.getElementById('batch-card').style.display = 'none';
+        
+        if (tab === 'sentiment') {
+            document.getElementById('card-title-text').textContent = isCompareMode ? 'Porównanie tonalności tekstów' : 'Analiza tonalności tekstu';
+            document.getElementById('input-icon').textContent = isCompareMode ? '⚖️' : '📝';
+            document.getElementById('examples-sentiment').style.display = isCompareMode ? 'none' : '';
+            document.getElementById('examples-ai').style.display = 'none';
+            document.getElementById('compare-toggle-btn').style.display = '';
+            document.getElementById('analyze-btn').textContent = isCompareMode ? '✨ Porównaj teksty' : '✨ Analizuj tekst';
+        } else {
+
+            if (isCompareMode) toggleCompareMode();
+            document.getElementById('card-title-text').textContent = 'Sprawdzenie tekstu pod kątem AI';
+            document.getElementById('input-icon').textContent = '🤖';
+            document.getElementById('examples-sentiment').style.display = 'none';
+            document.getElementById('examples-ai').style.display = '';
+            document.getElementById('compare-toggle-btn').style.display = 'none';
+            document.getElementById('analyze-btn').textContent = '✨ Analizuj tekst';
+        }
+    }
+}
+
+function setExample(key) {
+    document.getElementById('text-input').value = examples[key];
+    updateCounters();
+}
+
+function updateCounters() {
+    const txt = document.getElementById('text-input').value;
+    document.getElementById('char-counter').textContent = txt.length;
+    const words = txt.trim() ? txt.trim().split(/\s+/).length : 0;
+    document.getElementById('word-counter').textContent = words;
+}
+document.getElementById('text-input').addEventListener('input', updateCounters);
+
+function toggleCompareMode() {
+    isCompareMode = !isCompareMode;
+    const btn = document.getElementById('compare-toggle-btn');
+    const singleWrap = document.getElementById('single-textarea-wrap');
+    const compareWrap = document.getElementById('compare-textareas-wrap');
+    const metaWrap = document.getElementById('input-meta-wrap');
+    const examplesSent = document.getElementById('examples-sentiment');
+    
+    if (isCompareMode) {
+        btn.textContent = '📝 Analiza zwykła';
+        btn.style.background = 'var(--accent-gradient-soft)';
+        btn.style.borderColor = 'var(--accent-2)';
+        singleWrap.style.display = 'none';
+        compareWrap.style.display = 'flex';
+        metaWrap.style.display = 'none';
+        examplesSent.style.display = 'none';
+        document.getElementById('card-title-text').textContent = 'Porównanie tonalności tekstów';
+        document.getElementById('input-icon').textContent = '⚖️';
+        document.getElementById('analyze-btn').textContent = '✨ Porównaj teksty';
+    } else {
+        btn.textContent = '⚖️ Porównaj teksty';
+        btn.style.background = 'rgba(255,255,255,0.05)';
+        btn.style.borderColor = 'var(--border-color)';
+        singleWrap.style.display = 'block';
+        compareWrap.style.display = 'none';
+        metaWrap.style.display = 'flex';
+        examplesSent.style.display = '';
+        document.getElementById('card-title-text').textContent = 'Analiza tonalności tekstu';
+        document.getElementById('input-icon').textContent = '📝';
+        document.getElementById('analyze-btn').textContent = '✨ Analizuj tekst';
+    }
+}
+
+async function analyzeText() {
+    if (isCompareMode) {
+        await compareTexts();
+        return;
+    }
+
+    const text = document.getElementById('text-input').value.trim();
+    if (!text) { shakeButton(); return; }
+
+    document.getElementById('loading').classList.add('show');
+    document.getElementById('sentiment-results').classList.remove('show');
+    document.getElementById('ai-results').classList.remove('show');
+    document.getElementById('compare-results').style.display = 'none';
+    document.getElementById('analyze-btn').disabled = true;
+
+    try {
+        const res = await fetch('/analyze', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ text, type: currentTab })
+        });
+        const data = await res.json();
+
+        if (data.error && typeof data.error === 'string') {
+            alert(data.error);
+            return;
+        }
+
+        lastAnalyzedData = {
+            text: text,
+            ...data
+        };
+
+        if (currentTab === 'sentiment') showSentimentResults(data);
+        else showAIResults(data);
+
+        saveToHistory(text, currentTab, data);
+
+    } catch (err) {
+        alert('Błąd: ' + err.message);
+    } finally {
+        document.getElementById('loading').classList.remove('show');
+        document.getElementById('analyze-btn').disabled = false;
+    }
+}
+
+async function compareTexts() {
+    const text1 = document.getElementById('text-input-1').value.trim();
+    const text2 = document.getElementById('text-input-2').value.trim();
+    
+    if (!text1 || !text2) {
+        alert('Proszę wprowadzić oba teksty do porównania.');
+        return;
+    }
+    
+    document.getElementById('loading').classList.add('show');
+    document.getElementById('sentiment-results').classList.remove('show');
+    document.getElementById('ai-results').classList.remove('show');
+    document.getElementById('compare-results').style.display = 'none';
+    document.getElementById('analyze-btn').disabled = true;
+    
+    try {
+        const res = await fetch('/compare', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ text1, text2 })
+        });
+        const data = await res.json();
+        
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+        
+        showCompareResults(data);
+        saveToHistory(text1 + " vs " + text2, 'sentiment', { sentiment: { category: 'Porównanie', emoji: '⚖️', combined_score: data.comparison.sentiment_diff } });
+        
+    } catch (err) {
+        alert('Błąd porównania: ' + err.message);
+    } finally {
+        document.getElementById('loading').classList.remove('show');
+        document.getElementById('analyze-btn').disabled = false;
+    }
+}
+
+function shakeButton() {
+    const btn = document.getElementById('analyze-btn');
+    btn.style.animation = 'shake 0.4s ease';
+    setTimeout(() => btn.style.animation = '', 400);
+}
+
+function showSentimentResults(data) {
+    const s = data.sentiment;
+
+    document.getElementById('s-emoji').textContent = s.emoji;
+    const catEl = document.getElementById('s-category');
+    catEl.textContent = s.category;
+    catEl.className = 'big-category';
+    if (s.combined_score > 0.1) catEl.classList.add('positive');
+    else if (s.combined_score < -0.1) catEl.classList.add('negative');
+    else catEl.classList.add('neutral');
+
+    document.getElementById('s-score-text').textContent = `Wynik łączony: ${s.combined_score}`;
+    document.getElementById('s-pos-pct').textContent = s.positive_pct + '%';
+    document.getElementById('s-neg-pct').textContent = s.negative_pct + '%';
+    document.getElementById('s-bar-fill').style.width = s.positive_pct + '%';
+
+    document.getElementById('s-vader').textContent = s.vader.compound;
+    document.getElementById('s-textblob').textContent = s.textblob.polarity;
+    document.getElementById('s-subjectivity').textContent = s.textblob.subjectivity + '%';
+    document.getElementById('s-combined').textContent = s.combined_score;
+
+    if (data.language) {
+        const flag = FLAG_MAP[data.language.code] || '🌐';
+        document.getElementById('s-lang-val').textContent = `${flag} ${data.language.name} (${data.language.confidence}%)`;
+        document.getElementById('s-lang-badge').style.display = 'inline-flex';
+    } else {
+        document.getElementById('s-lang-badge').style.display = 'none';
+    }
+
+    if (data.topics && data.topics.categories && Object.keys(data.topics.categories).length > 0) {
+        const grid = document.getElementById('topics-grid');
+        let html = '';
+        for (const [name, info] of Object.entries(data.topics.categories)) {
+            const kwHtml = info.keywords.map(k => `<span class="topic-keyword-chip">${k}</span>`).join('');
+            html += `
+            <div class="topic-item">
+                <div class="topic-header">
+                    <span style="text-transform: capitalize;">${name}</span>
+                    <span class="topic-relevance">Trafność: ${info.relevance}%</span>
+                </div>
+                <div class="topic-keywords">${kwHtml}</div>
+            </div>`;
+        }
+        grid.innerHTML = html;
+        document.getElementById('s-topics-card').style.display = 'block';
+    } else {
+        document.getElementById('s-topics-card').style.display = 'none';
+    }
+
+    if (data.recommendations && data.recommendations.length > 0) {
+        const list = document.getElementById('s-recommendations-list');
+        list.innerHTML = data.recommendations.map(r => `<div class="recommendation-item">📌 ${r}</div>`).join('');
+        document.getElementById('s-recommendations-card').style.display = 'block';
+    } else {
+        document.getElementById('s-recommendations-card').style.display = 'none';
+    }
+
+    renderWordHighlights(data.words);
+
+    renderEmotions(data.emotions);
+
+    renderStats(data.stats, 's-stats-grid', 's-top-words-section');
+
+    document.getElementById('sentiment-results').classList.add('show');
+    document.getElementById('sentiment-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderWordHighlights(words) {
+    const box = document.getElementById('word-highlight-box');
+    let html = '';
+    for (const w of words) {
+        if (w.type === 'space') {
+            html += w.text;
+        } else if (w.type === 'positive') {
+            html += `<span class="w-pos" title="Score: ${w.score}">${w.text}</span>`;
+        } else if (w.type === 'negative') {
+            html += `<span class="w-neg" title="Score: ${w.score}">${w.text}</span>`;
+        } else {
+            html += `<span title="Score: ${w.score}">${w.text}</span>`;
+        }
+    }
+    box.innerHTML = html;
+}
+
+function renderEmotions(emotions) {
+    if (emotionsChart) { emotionsChart.destroy(); emotionsChart = null; }
+
+    const labels = Object.keys(emotions.scores).map(k => EMOTION_NAMES[k]);
+    const values = Object.values(emotions.scores);
+    const colors = Object.keys(emotions.scores).map(k => EMOTION_COLORS[k]);
+
+    const ctx = document.getElementById('emotions-chart').getContext('2d');
+    emotionsChart = new Chart(ctx, {
+        type: 'radar',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: values,
+                backgroundColor: 'rgba(124,92,252,0.15)',
+                borderColor: '#7c5cfc',
+                borderWidth: 2,
+                pointBackgroundColor: colors,
+                pointBorderColor: colors,
+                pointRadius: 5,
+                pointHoverRadius: 7
+            }]
+        },
+        options: {
+            responsive: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                r: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: { display: false, stepSize: 25 },
+                    grid: { color: 'rgba(255,255,255,0.06)' },
+                    angleLines: { color: 'rgba(255,255,255,0.06)' },
+                    pointLabels: {
+                        color: 'rgba(255,255,255,0.6)',
+                        font: { size: 12, family: 'Inter', weight: '600' }
+                    }
+                }
+            }
+        }
+    });
+
+    const legendEl = document.getElementById('emotions-legend');
+    let html = '';
+    for (const [key, value] of Object.entries(emotions.scores)) {
+        const c = EMOTION_COLORS[key];
+        html += `
+        <div class="emotion-item">
+            <span class="emotion-emoji">${EMOTION_EMOJIS[key]}</span>
+            <div class="emotion-info">
+                <div class="emotion-name">${EMOTION_NAMES[key]}</div>
+                <div class="emotion-bar-bg"><div class="emotion-bar-fg" style="width:${value}%; background:${c};"></div></div>
+            </div>
+            <span class="emotion-value" style="color:${c}">${value}%</span>
+        </div>`;
+    }
+    legendEl.innerHTML = html;
+}
+
+let gaugeChart = null;
+
+function showAIResults(data) {
+    const ai = data.ai;
+
+    if (ai.error) {
+        document.getElementById('ai-pct-text').textContent = '—';
+        document.getElementById('ai-verdict').textContent = ai.verdict;
+        document.getElementById('ai-verdict-desc').textContent = 'Wymagane minimum 30 znaków';
+        document.getElementById('ai-lang-badge').style.display = 'none';
+        document.getElementById('ai-recommendations-card').style.display = 'none';
+        document.getElementById('ai-results').classList.add('show');
+        return;
+    }
+
+    drawGauge(ai.ai_probability);
+
+    const pctEl = document.getElementById('ai-pct-text');
+    pctEl.textContent = ai.ai_probability + '%';
+    pctEl.className = 'gauge-pct';
+    if (ai.ai_probability >= 65) pctEl.classList.add('high');
+    else if (ai.ai_probability >= 40) pctEl.classList.add('medium');
+    else pctEl.classList.add('low');
+
+    document.getElementById('ai-verdict').textContent = ai.verdict;
+    const descMap = {
+        high: 'Tekst ma cechy typowe dla generowania przez AI',
+        medium: 'Niektóre cechy wskazują na możliwe użycie AI',
+        uncertain: 'Nie można jednoznacznie określić autora tekstu',
+        low: 'Tekst ma cechy charakterystyczne dla pisania ludzkiego',
+        very_low: 'Tekst wygląda na naturalnie napisany przez człowieka'
+    };
+    document.getElementById('ai-verdict-desc').textContent = descMap[ai.verdict_level] || '';
+
+    document.getElementById('ai-human-pct').textContent = ai.human_probability + '%';
+    document.getElementById('ai-ai-pct').textContent = ai.ai_probability + '%';
+    document.getElementById('ai-bar-fill').style.width = ai.human_probability + '%';
+
+    if (data.language) {
+        const flag = FLAG_MAP[data.language.code] || '🌐';
+        document.getElementById('ai-lang-val').textContent = `${flag} ${data.language.name} (${data.language.confidence}%)`;
+        document.getElementById('ai-lang-badge').style.display = 'inline-flex';
+    } else {
+        document.getElementById('ai-lang-badge').style.display = 'none';
+    }
+
+    if (data.recommendations && data.recommendations.length > 0) {
+        const list = document.getElementById('ai-recommendations-list');
+        list.innerHTML = data.recommendations.map(r => `<div class="recommendation-item">📌 ${r}</div>`).join('');
+        document.getElementById('ai-recommendations-card').style.display = 'block';
+    } else {
+        document.getElementById('ai-recommendations-card').style.display = 'none';
+    }
+
+    let metricsHtml = '';
+    for (const [name, value] of Object.entries(ai.details)) {
+        let color;
+        if (value >= 65) color = 'var(--negative)';
+        else if (value >= 40) color = 'var(--neutral)';
+        else color = 'var(--positive)';
+        metricsHtml += `
+        <div class="metric-row">
+            <span class="metric-name">${name}</span>
+            <div class="metric-bar-outer">
+                <div class="metric-bar-inner" style="width:${value}%; background:${color};"></div>
+            </div>
+            <span class="metric-val" style="color:${color}">${value}%</span>
+        </div>`;
+    }
+    document.getElementById('ai-metrics-list').innerHTML = metricsHtml;
+
+    renderStats(data.stats, 'ai-stats-grid', 'ai-top-words-section');
+
+    document.getElementById('ai-results').classList.add('show');
+    document.getElementById('ai-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function drawGauge(pct) {
+    if (gaugeChart) { gaugeChart.destroy(); gaugeChart = null; }
+
+    const ctx = document.getElementById('ai-gauge').getContext('2d');
+    const aiVal = pct;
+    const humanVal = 100 - pct;
+
+    let aiColor, humanColor;
+    if (pct >= 65) { aiColor = '#f87171'; humanColor = 'rgba(248,113,113,0.15)'; }
+    else if (pct >= 40) { aiColor = '#facc15'; humanColor = 'rgba(250,204,21,0.15)'; }
+    else { aiColor = '#4ade80'; humanColor = 'rgba(74,222,128,0.15)'; }
+
+    gaugeChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            datasets: [{
+                data: [aiVal, humanVal],
+                backgroundColor: [aiColor, humanColor],
+                borderWidth: 0,
+                circumference: 270,
+                rotation: 225
+            }]
+        },
+        options: {
+            responsive: false,
+            cutout: '78%',
+            plugins: { legend: { display: false }, tooltip: { enabled: false } },
+            animation: { animateRotate: true, duration: 1200 }
+        }
+    });
+}
+
+function showCompareResults(data) {
+    const sentDiff = data.comparison.sentiment_diff;
+    const aiDiff = data.comparison.ai_diff;
+    const lenDiff = data.comparison.word_count_diff;
+    const isSameLang = data.comparison.same_language;
+    
+    const sDiffEl = document.getElementById('comp-sent-diff');
+    sDiffEl.textContent = (sentDiff > 0 ? '+' : '') + sentDiff;
+    sDiffEl.style.color = sentDiff > 0.05 ? 'var(--positive)' : (sentDiff < -0.05 ? 'var(--negative)' : 'var(--neutral)');
+    
+    const aiDiffEl = document.getElementById('comp-ai-diff');
+    aiDiffEl.textContent = (aiDiff > 0 ? '+' : '') + aiDiff + '%';
+    aiDiffEl.style.color = aiDiff > 5 ? 'var(--negative)' : (aiDiff < -5 ? 'var(--positive)' : 'var(--neutral)');
+    
+    document.getElementById('comp-len-diff').textContent = (lenDiff > 0 ? '+' : '') + lenDiff;
+    
+    const langEl = document.getElementById('comp-lang-same');
+    langEl.textContent = isSameLang ? 'Tak ✅' : 'Nie ❌';
+    langEl.style.color = isSameLang ? 'var(--positive)' : 'var(--negative)';
+    
+    const t1 = data.text1;
+    document.getElementById('comp1-s-emoji').textContent = t1.sentiment.emoji;
+    document.getElementById('comp1-s-cat').textContent = t1.sentiment.category;
+    document.getElementById('comp1-s-score').textContent = `(${t1.sentiment.combined_score})`;
+    document.getElementById('comp1-ai-pct').textContent = t1.ai.ai_probability + '% AI';
+    renderStats(t1.stats, 'comp1-stats', 'comp1-topics');
+    
+    const comp1Topics = document.getElementById('comp1-topics');
+    if (t1.topics && t1.topics.categories && Object.keys(t1.topics.categories).length > 0) {
+        comp1Topics.innerHTML = Object.keys(t1.topics.categories).map(name => `<span class="topic-relevance" style="margin-bottom:4px; display:inline-block; font-size:10px;">${name}</span>`).join(' ');
+    } else {
+        comp1Topics.innerHTML = '—';
+    }
+    
+    const comp1Recs = document.getElementById('comp1-recs');
+    comp1Recs.innerHTML = t1.recommendations.slice(0, 3).map(r => `<div style="font-size:11px; padding:6px 8px; background:rgba(255,255,255,0.02); border-left:2px solid var(--accent-1); border-radius:4px;">${r}</div>`).join('') || '—';
+    
+    const t2 = data.text2;
+    document.getElementById('comp2-s-emoji').textContent = t2.sentiment.emoji;
+    document.getElementById('comp2-s-cat').textContent = t2.sentiment.category;
+    document.getElementById('comp2-s-score').textContent = `(${t2.sentiment.combined_score})`;
+    document.getElementById('comp2-ai-pct').textContent = t2.ai.ai_probability + '% AI';
+    renderStats(t2.stats, 'comp2-stats', 'comp2-topics');
+    
+    const comp2Topics = document.getElementById('comp2-topics');
+    if (t2.topics && t2.topics.categories && Object.keys(t2.topics.categories).length > 0) {
+        comp2Topics.innerHTML = Object.keys(t2.topics.categories).map(name => `<span class="topic-relevance" style="margin-bottom:4px; display:inline-block; font-size:10px; background:var(--accent-gradient-soft); color:var(--accent-2);">${name}</span>`).join(' ');
+    } else {
+        comp2Topics.innerHTML = '—';
+    }
+    
+    const comp2Recs = document.getElementById('comp2-recs');
+    comp2Recs.innerHTML = t2.recommendations.slice(0, 3).map(r => `<div style="font-size:11px; padding:6px 8px; background:rgba(255,255,255,0.02); border-left:2px solid var(--accent-2); border-radius:4px;">${r}</div>`).join('') || '—';
+    
+    document.getElementById('compare-results').style.display = 'block';
+    document.getElementById('compare-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function exportReport(type) {
+    if (!lastAnalyzedData) {
+        alert('Brak danych do wygenerowania raportu. Najpierw przeprowadź analizę.');
+        return;
+    }
+    
+    const reportWindow = window.open('', '_blank');
+    if (!reportWindow) {
+        alert('Wyłącz blokowanie wyskakujących okienek, aby otworzyć raport.');
+        return;
+    }
+    
+    reportWindow.document.write('<html><head><title>Generowanie raportu...</title><style>body { font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; background: #0f0f1a; color: #e8e8f0; }</style></head><body><h3>Generowanie raportu... proszę czekać</h3></body></html>');
+    
+    fetch('/export_report', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(lastAnalyzedData)
+    })
+    .then(res => res.text())
+    .then(html => {
+        reportWindow.document.open();
+        reportWindow.document.write(html);
+        reportWindow.document.close();
+    })
+    .catch(err => {
+        reportWindow.close();
+        alert('Błąd generowania raportu: ' + err.message);
+    });
+}
+
+function triggerFileInput() {
+    document.getElementById('csv-file-input').click();
+}
+
+function handleFileSelect(e) {
+    const files = e.target.files || e.dataTransfer.files;
+    if (!files || files.length === 0) return;
+    
+    const file = files[0];
+    if (!file.name.endsWith('.csv')) {
+        alert('Wybrany plik musi mieć rozszerzenie .csv');
+        return;
+    }
+    
+    selectedFile = file;
+    document.getElementById('file-name').textContent = file.name;
+    document.getElementById('file-size').textContent = (file.size / 1024).toFixed(1) + ' KB';
+    
+    document.getElementById('csv-drag-drop').style.display = 'none';
+    document.getElementById('selected-file-info').style.display = 'flex';
+    document.getElementById('analyze-batch-btn').disabled = false;
+}
+
+function removeSelectedFile() {
+    selectedFile = null;
+    document.getElementById('csv-file-input').value = '';
+    document.getElementById('csv-drag-drop').style.display = 'block';
+    document.getElementById('selected-file-info').style.display = 'none';
+    document.getElementById('analyze-batch-btn').disabled = true;
+}
+
+setTimeout(() => {
+    const dragDropZone = document.getElementById('csv-drag-drop');
+    if (dragDropZone) {
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dragDropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                dragDropZone.classList.add('dragover');
+            }, false);
+        });
+        
+        ['dragleave', 'drop'].forEach(eventName => {
+            dragDropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                dragDropZone.classList.remove('dragover');
+            }, false);
+        });
+        
+        dragDropZone.addEventListener('drop', (e) => {
+            handleFileSelect(e);
+        }, false);
+    }
+}, 500);
+
+async function analyzeBatch() {
+    if (!selectedFile) return;
+    
+    document.getElementById('loading').classList.add('show');
+    document.getElementById('batch-results').style.display = 'none';
+    document.getElementById('analyze-batch-btn').disabled = true;
+    
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+    
+    try {
+        const res = await fetch('/analyze_batch', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+        
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+        
+        showBatchResults(data);
+        
+    } catch (err) {
+        alert('Błąd analizy zbiorczej: ' + err.message);
+    } finally {
+        document.getElementById('loading').classList.remove('show');
+        document.getElementById('analyze-batch-btn').disabled = false;
+    }
+}
+
+function showBatchResults(data) {
+    const summary = data.summary;
+    
+    document.getElementById('b-total-reviews').textContent = summary.total_reviews;
+    document.getElementById('b-avg-sentiment').textContent = summary.average_sentiment;
+    
+    document.getElementById('b-dist-pos').textContent = summary.distribution.positive;
+    document.getElementById('b-dist-neu').textContent = summary.distribution.neutral;
+    document.getElementById('b-dist-neg').textContent = summary.distribution.negative;
+    
+    drawBatchChart(summary.distribution);
+    
+    const tbody = document.getElementById('batch-table-body');
+    let html = '';
+    for (const r of data.results) {
+        const score = r.sentiment.combined_score;
+        let badgeColor = 'var(--neutral)';
+        if (score >= 0.1) badgeColor = 'var(--positive)';
+        else if (score <= -0.1) badgeColor = 'var(--negative)';
+        
+        const langFlag = FLAG_MAP[r.language.code] || '🌐';
+        
+        html += `
+        <tr>
+            <td style="font-weight:600; color:var(--text-secondary);">${r.row}</td>
+            <td title="${r.text}" style="max-width:250px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${r.text}</td>
+            <td>${langFlag} ${r.language.name}</td>
+            <td>${r.dominant_emotion}</td>
+            <td><span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${badgeColor}; margin-right:6px;"></span>${r.sentiment.category}</td>
+            <td style="font-weight:600; color:${badgeColor};">${score > 0 ? '+' : ''}${score}</td>
+        </tr>`;
+    }
+    tbody.innerHTML = html;
+    
+    document.getElementById('batch-results').style.display = 'block';
+    document.getElementById('batch-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function drawBatchChart(dist) {
+    if (batchChart) { batchChart.destroy(); batchChart = null; }
+    
+    const ctx = document.getElementById('batch-chart').getContext('2d');
+    batchChart = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: ['Pozytywne', 'Neutralne', 'Negatywne'],
+            datasets: [{
+                data: [dist.positive, dist.neutral, dist.negative],
+                backgroundColor: ['#4ade80', '#facc15', '#f87171'],
+                borderWidth: 1,
+                borderColor: '#1a1a2e'
+            }]
+        },
+        options: {
+            responsive: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        color: 'rgba(255,255,255,0.7)',
+                        font: { family: 'Inter', size: 11 }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderStats(stats, gridId, topWordsId) {
+    const items = [
+        { val: stats.word_count, label: 'Słów' },
+        { val: stats.sentence_count, label: 'Zdań' },
+        { val: stats.unique_words, label: 'Unikalnych słów' },
+        { val: stats.avg_sentence_len, label: 'Śr. dł. zdania' },
+        { val: stats.avg_word_len, label: 'Śr. dł. słowa' },
+        { val: stats.vocabulary_richness + '%', label: 'Bogactwo leksykalne' },
+        { val: stats.readability, label: 'Czytelność' },
+        { val: stats.difficulty, label: 'Trudność', color: stats.difficulty_color }
+    ];
+
+    let html = '';
+    for (const item of items) {
+        html += `
+        <div class="stat-card">
+            <div class="stat-val" ${item.color ? `style="-webkit-text-fill-color:${item.color}"` : ''}>${item.val}</div>
+            <div class="stat-label">${item.label}</div>
+        </div>`;
+    }
+    document.getElementById(gridId).innerHTML = html;
+
+    if (stats.top_words && stats.top_words.length > 0) {
+        let twHtml = '<div class="examples-label">Najczęstsze słowa</div><div class="top-words">';
+        for (const tw of stats.top_words) {
+            twHtml += `<span class="top-word-chip">${tw.word}<span class="top-word-count">×${tw.count}</span></span>`;
+        }
+        twHtml += '</div>';
+        document.getElementById(topWordsId).innerHTML = twHtml;
+    } else {
+        document.getElementById(topWordsId).innerHTML = '';
+    }
+}
+
+function saveToHistory(text, type, data) {
+    let history = JSON.parse(localStorage.getItem('textscope_history') || '[]');
+    const entry = {
+        text: text.substring(0, 120),
+        type: type,
+        result: type === 'sentiment' ? data.sentiment.category : (data.ai.ai_probability + '% AI'),
+        emoji: type === 'sentiment' ? data.sentiment.emoji : '🤖',
+        time: new Date().toLocaleString('pl-PL'),
+        fullText: text
+    };
+    history.unshift(entry);
+    if (history.length > 20) history = history.slice(0, 20);
+    localStorage.setItem('textscope_history', JSON.stringify(history));
+    renderHistory();
+}
+
+function renderHistory() {
+    const history = JSON.parse(localStorage.getItem('textscope_history') || '[]');
+    const list = document.getElementById('history-list');
+
+    if (history.length === 0) {
+        list.innerHTML = '<div class="history-empty">Historia jest pusta</div>';
+        return;
+    }
+
+    let html = '<div style="text-align:right;margin-bottom:8px;">' +
+        '<button class="history-clear-btn" onclick="clearHistory()">🗑 Wyczyść</button></div>';
+
+    for (let i = 0; i < history.length; i++) {
+        const h = history[i];
+        html += `
+        <div class="history-item" onclick="loadFromHistory(${i})">
+            <div class="history-item-header">
+                <span class="history-type">${h.emoji} ${h.type === 'sentiment' ? 'Tonalność' : 'Detekcja AI'}</span>
+                <span class="history-time">${h.time}</span>
+            </div>
+            <div class="history-text">${h.text}${h.text.length >= 120 ? '...' : ''}</div>
+            <div style="font-size:12px;margin-top:4px;color:var(--accent-1);font-weight:600;">${h.result}</div>
+        </div>`;
+    }
+    list.innerHTML = html;
+}
+
+function loadFromHistory(index) {
+    const history = JSON.parse(localStorage.getItem('textscope_history') || '[]');
+    if (history[index]) {
+        const h = history[index];
+        switchTab(h.type);
+        document.getElementById('text-input').value = h.fullText;
+        updateCounters();
+    }
+}
+
+function clearHistory() {
+    if (confirm('Wyczyścić całą historię?')) {
+        localStorage.removeItem('textscope_history');
+        renderHistory();
+    }
+}
+
+function toggleHistory() {
+    const toggle = document.getElementById('history-toggle');
+    const list = document.getElementById('history-list');
+    toggle.classList.toggle('open');
+    list.classList.toggle('show');
+}
+
+renderHistory();
+
+document.getElementById('text-input').addEventListener('keydown', function(e) {
+    if (e.ctrlKey && e.key === 'Enter') {
+        e.preventDefault();
+        analyzeText();
+    }
+});
+
+const style = document.createElement('style');
+style.textContent = `@keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-8px)} 75%{transform:translateX(8px)} }`;
+document.head.appendChild(style);
+</script>
+
+</body>
+</html>
