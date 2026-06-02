@@ -9,6 +9,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         :root {
             --bg-primary: #0f0f1a;
@@ -18,7 +19,7 @@
             --border-color: rgba(255, 255, 255, 0.06);
             --text-primary: #e8e8f0;
             --text-secondary: #9595b0;
-            --text-muted: #6565805a;
+            --text-muted: rgba(101, 101, 128, 0.35);
             --accent-1: #7c5cfc;
             --accent-2: #c84cff;
             --accent-3: #ff6b9d;
@@ -34,111 +35,6 @@
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
-
-        .compare-toggle-btn:hover {
-            background: rgba(255,255,255,0.1) !important;
-            border-color: var(--accent-1) !important;
-            color: var(--accent-1) !important;
-        }
-        
-        .drag-drop-zone {
-            transition: all 0.3s ease;
-        }
-        .drag-drop-zone.dragover {
-            border-color: var(--accent-2) !important;
-            background: rgba(200,76,255,0.08) !important;
-            box-shadow: 0 0 20px rgba(200,76,255,0.1);
-        }
-        
-        .recommendation-item {
-            padding: 12px 16px;
-            border-radius: var(--radius-sm);
-            background: rgba(255,255,255,0.02);
-            border-left: 4px solid var(--accent-1);
-            font-size: 13px;
-            line-height: 1.5;
-            color: var(--text-primary);
-            display: flex;
-            align-items: flex-start;
-            gap: 10px;
-        }
-        
-        .topic-item {
-            background: rgba(255,255,255,0.02);
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-sm);
-            padding: 12px 14px;
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-            transition: all 0.2s ease;
-        }
-        .topic-item:hover {
-            border-color: rgba(255, 255, 255, 0.12);
-            background: rgba(255,255,255,0.03);
-        }
-        .topic-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-weight: 600;
-            font-size: 13px;
-        }
-        .topic-relevance {
-            font-size: 10px;
-            color: var(--accent-1);
-            background: var(--accent-gradient-soft);
-            padding: 2px 6px;
-            border-radius: 10px;
-            font-weight: 700;
-        }
-        .topic-keywords {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 4px;
-        }
-        .topic-keyword-chip {
-            font-size: 10px;
-            padding: 2px 6px;
-            background: rgba(255,255,255,0.05);
-            border-radius: 4px;
-            color: var(--text-secondary);
-        }
-        
-        .export-btn:hover {
-            background: var(--accent-gradient) !important;
-            color: white !important;
-            box-shadow: 0 4px 15px rgba(124,92,252,0.25);
-            border-color: transparent !important;
-        }
-
-        .lang-badge {
-            transition: all 0.2s ease;
-        }
-        .lang-badge:hover {
-            background: rgba(255,255,255,0.12) !important;
-            color: var(--text-primary) !important;
-        }
-        
-        .batch-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 15px;
-            font-size: 13px;
-        }
-        .batch-table th, .batch-table td {
-            padding: 10px 12px;
-            border-bottom: 1px solid var(--border-color);
-            text-align: left;
-        }
-        .batch-table th {
-            font-weight: 600;
-            color: var(--text-secondary);
-            background: rgba(255,255,255,0.02);
-        }
-        .batch-table tr:hover td {
-            background: rgba(255,255,255,0.01);
-        }
 
         body {
             font-family: 'Inter', -apple-system, sans-serif;
@@ -295,6 +191,34 @@
             font-size: 16px;
         }
 
+        /* Real-time editable div styling */
+        .editor-input {
+            width: 100%;
+            height: 170px;
+            background: rgba(0,0,0,0.25);
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            padding: 16px;
+            font-size: 14px;
+            font-family: 'Inter', sans-serif;
+            color: var(--text-primary);
+            overflow-y: auto;
+            outline: none;
+            line-height: 1.6;
+            transition: all 0.3s ease;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .editor-input:focus {
+            border-color: var(--accent-1);
+            box-shadow: 0 0 0 3px rgba(124,92,252,0.15);
+        }
+        .editor-input[contenteditable=true]:empty:before {
+            content: attr(placeholder);
+            color: rgba(150,150,180,0.4);
+            display: block;
+        }
+
         textarea {
             width: 100%;
             height: 170px;
@@ -314,7 +238,6 @@
             border-color: var(--accent-1);
             box-shadow: 0 0 0 3px rgba(124,92,252,0.15);
         }
-        textarea::placeholder { color: rgba(150,150,180,0.4); }
 
         .input-meta {
             display: flex;
@@ -393,7 +316,6 @@
         }
         .analyze-btn:active { transform: translateY(0) scale(0.98); }
         .analyze-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-        .analyze-btn:disabled::before { display: none; }
 
         .loading { display: none; text-align: center; padding: 50px 20px; }
         .loading.show { display: block; animation: fadeIn 0.3s ease; }
@@ -471,10 +393,6 @@
             top: 0; left: 0; right: 0; bottom: 0;
             background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
             animation: shimmer 2s infinite;
-        }
-        @keyframes shimmer {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(100%); }
         }
 
         .detail-grid {
@@ -786,6 +704,111 @@
         }
         .history-clear-btn:hover { background: rgba(248,113,113,0.1); }
 
+        .compare-toggle-btn:hover {
+            background: rgba(255,255,255,0.1) !important;
+            border-color: var(--accent-1) !important;
+            color: var(--accent-1) !important;
+        }
+        
+        .drag-drop-zone {
+            transition: all 0.3s ease;
+        }
+        .drag-drop-zone.dragover {
+            border-color: var(--accent-2) !important;
+            background: rgba(200,76,255,0.08) !important;
+            box-shadow: 0 0 20px rgba(200,76,255,0.1);
+        }
+        
+        .recommendation-item {
+            padding: 12px 16px;
+            border-radius: var(--radius-sm);
+            background: rgba(255,255,255,0.02);
+            border-left: 4px solid var(--accent-1);
+            font-size: 13px;
+            line-height: 1.5;
+            color: var(--text-primary);
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+        
+        .topic-item {
+            background: rgba(255,255,255,0.02);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            padding: 12px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            transition: all 0.2s ease;
+        }
+        .topic-item:hover {
+            border-color: rgba(255, 255, 255, 0.12);
+            background: rgba(255,255,255,0.03);
+        }
+        .topic-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+            font-size: 13px;
+        }
+        .topic-relevance {
+            font-size: 10px;
+            color: var(--accent-1);
+            background: var(--accent-gradient-soft);
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-weight: 700;
+        }
+        .topic-keywords {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+        .topic-keyword-chip {
+            font-size: 10px;
+            padding: 2px 6px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 4px;
+            color: var(--text-secondary);
+        }
+        
+        .export-btn:hover {
+            background: var(--accent-gradient) !important;
+            color: white !important;
+            box-shadow: 0 4px 15px rgba(124,92,252,0.25);
+            border-color: transparent !important;
+        }
+
+        .lang-badge {
+            transition: all 0.2s ease;
+        }
+        .lang-badge:hover {
+            background: rgba(255,255,255,0.12) !important;
+            color: var(--text-primary) !important;
+        }
+        
+        .batch-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            font-size: 13px;
+        }
+        .batch-table th, .batch-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border-color);
+            text-align: left;
+        }
+        .batch-table th {
+            font-weight: 600;
+            color: var(--text-secondary);
+            background: rgba(255,255,255,0.02);
+        }
+        .batch-table tr:hover td {
+            background: rgba(255,255,255,0.01);
+        }
+
         .footer {
             text-align: center;
             padding: 30px 20px;
@@ -851,7 +874,7 @@
         </div>
 
         <div id="single-textarea-wrap">
-            <textarea id="text-input" placeholder="Wstaw tekst do analizy...&#10;&#10;Na przykład, opinia z Google Maps, artykuł lub dowolny tekst."></textarea>
+            <div class="editor-input" id="text-input" contenteditable="true" placeholder="Wstaw tekst do analizy...&#10;Na przykład, opinia z Google Maps, artykuł lub dowolny tekst."></div>
         </div>
         
         <div id="compare-textareas-wrap" style="display: none; gap: 16px; margin-bottom: 12px; flex-wrap: wrap;">
@@ -935,8 +958,11 @@
     <div class="results" id="sentiment-results">
         
         <div style="display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 14px;">
+            <button class="export-btn" onclick="exportJSON()" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px 16px; border-radius: var(--radius-sm); cursor: pointer; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; transition: all 0.2s;">
+                📥 Pobierz dane JSON
+            </button>
             <button class="export-btn" id="s-export-btn" onclick="exportReport('sentiment')" style="background: rgba(124,92,252,0.1); border: 1px solid var(--accent-1); color: var(--text-primary); padding: 8px 16px; border-radius: var(--radius-sm); cursor: pointer; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; transition: all 0.2s;">
-                📄 Generuj raport PDF / HTML
+                📄 Eksportuj raport (HTML)
             </button>
         </div>
 
@@ -981,6 +1007,41 @@
             </div>
         </div>
 
+        <div class="card" id="summary-card" style="display:none;">
+            <div class="card-title">
+                <div class="icon">📝</div>
+                <span>Automatyczne podsumowanie tekstu</span>
+            </div>
+            <p style="color: var(--text-secondary); font-size: 12px; margin-bottom: 12px;">
+                Najważniejsze zdania wyekstrahowane metodą LSA (Latent Semantic Analysis):
+            </p>
+            <div id="summary-sentences-list" style="display: flex; flex-direction: column; gap: 8px;"></div>
+        </div>
+
+        <div class="card" id="grammar-card" style="display:none;">
+            <div class="card-title">
+                <div class="icon">✍️</div>
+                <span>Wykryte błędy językowe i korekta</span>
+            </div>
+            <p style="color: var(--text-secondary); font-size: 12px; margin-bottom: 12px;">
+                Wyszukane niezgodności gramatyczne, stylistyczne oraz ortograficzne:
+            </p>
+            <div id="grammar-errors-list" style="display: flex; flex-direction: column; gap: 8px;"></div>
+        </div>
+
+        <div class="card" id="sentences-chart-card" style="display:none;">
+            <div class="card-title">
+                <div class="icon">📈</div>
+                <span>Ewolucja tonacji w zdaniach</span>
+            </div>
+            <p style="color: var(--text-secondary); font-size: 12px; margin-bottom: 14px;">
+                Przebieg nastroju w tekście zdanie po zdaniu (od -1.0 dla bardzo negatywnego do 1.0 dla bardzo pozytywnego):
+            </p>
+            <div style="width: 100%; height: 260px;">
+                <canvas id="sentences-chart" style="width: 100%; height: 260px;"></canvas>
+            </div>
+        </div>
+
         <div class="card">
             <div class="card-title">
                 <div class="icon">🎨</div>
@@ -1002,9 +1063,7 @@
             <p style="color: var(--text-secondary); font-size: 12px; margin-bottom: 14px;">
                 Automatycznie sklasyfikowane wątki w tekście na podstawie dopasowania słów kluczowych:
             </p>
-            <div id="topics-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px;">
-                
-            </div>
+            <div id="topics-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px;"></div>
         </div>
 
         <div class="card">
@@ -1034,14 +1093,12 @@
                 <div class="icon">💡</div>
                 <span>Inteligentne wskazówki i rekomendacje</span>
             </div>
-            <div class="recommendations-list" id="s-recommendations-list" style="display: flex; flex-direction: column; gap: 10px;">
-                
-            </div>
+            <div class="recommendations-list" id="s-recommendations-list" style="display: flex; flex-direction: column; gap: 10px;"></div>
         </div>
 
         <div class="note">
             <strong>⚠️ Uwaga:</strong>
-            Analiza działa najlepiej z tekstem w języku angielskim (VADER + TextBlob są zoptymalizowane dla English).
+            Analiza działa najlepiej z tekstem w języku angielskim i polskim.
             Dla innych języków wyniki mogą być mniej dokładne.
         </div>
     </div>
@@ -1049,8 +1106,11 @@
     <div class="results" id="ai-results">
         
         <div style="display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 14px;">
+            <button class="export-btn" onclick="exportJSON()" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px 16px; border-radius: var(--radius-sm); cursor: pointer; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; transition: all 0.2s;">
+                📥 Pobierz dane JSON
+            </button>
             <button class="export-btn" id="ai-export-btn" onclick="exportReport('ai_detect')" style="background: rgba(124,92,252,0.1); border: 1px solid var(--accent-1); color: var(--text-primary); padding: 8px 16px; border-radius: var(--radius-sm); cursor: pointer; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; transition: all 0.2s;">
-                📄 Generuj raport PDF / HTML
+                📄 Eksportuj raport (HTML)
             </button>
         </div>
 
@@ -1091,7 +1151,7 @@
         <div class="card">
             <div class="card-title">
                 <div class="icon">📐</div>
-                <span>Szczegółowe metryki</span>
+                <span>Szczegółowe metryki AI</span>
             </div>
             <div id="ai-metrics-list"></div>
         </div>
@@ -1110,15 +1170,12 @@
                 <div class="icon">💡</div>
                 <span>Rekomendacje dotyczące stylu</span>
             </div>
-            <div class="recommendations-list" id="ai-recommendations-list" style="display: flex; flex-direction: column; gap: 10px;">
-                
-            </div>
+            <div class="recommendations-list" id="ai-recommendations-list" style="display: flex; flex-direction: column; gap: 10px;"></div>
         </div>
 
         <div class="note">
             <strong>⚠️ Uwaga:</strong>
-            Analiza opiera się na metodach heurystycznych (statystycznych) i nie jest w 100% dokładna.
-            Wyniki stanowią przybliżoną ocenę na podstawie cech tekstu.
+            Analiza opiera się на metodach heurystycznych i nie jest w 100% nieomylna.
         </div>
     </div>
 
@@ -1132,17 +1189,20 @@
                 <div class="detail-card">
                     <div class="label">Różnica tonacji (A - B)</div>
                     <div class="value" id="comp-sent-diff">0.000</div>
+                    <div style="font-size:11px; margin-top:4px; color:var(--text-secondary);" id="comp-sent-diff-arrow">—</div>
                 </div>
                 <div class="detail-card">
                     <div class="label">Różnica prawdp. AI (A - B)</div>
                     <div class="value" id="comp-ai-diff">0%</div>
+                    <div style="font-size:11px; margin-top:4px; color:var(--text-secondary);" id="comp-ai-diff-arrow">—</div>
                 </div>
                 <div class="detail-card">
                     <div class="label">Różnica słów (A - B)</div>
                     <div class="value" id="comp-len-diff">0</div>
+                    <div style="font-size:11px; margin-top:4px; color:var(--text-secondary);">różnica długości</div>
                 </div>
                 <div class="detail-card">
-                    <div class="label">Czy ta sama język?</div>
+                    <div class="label">Czy ten sam język?</div>
                     <div class="value" id="comp-lang-same">—</div>
                 </div>
             </div>
@@ -1252,6 +1312,17 @@
                 <div style="font-size: 12px; color: var(--text-secondary); font-weight: 500;">Wizualizacja rozkładu tonacji opinii</div>
             </div>
         </div>
+
+        <div class="card" id="batch-similarity-card" style="display: none;">
+            <div class="card-title">
+                <div class="icon">🔗</div>
+                <span>Grupy podobnych opinii (Klastry)</span>
+            </div>
+            <p style="color: var(--text-secondary); font-size: 12px; margin-bottom: 12px;">
+                Zgrupowane automatycznie opinie o zbieżnym kontekście za pomocą analizy wektorowej TF-IDF i Cosine Similarity:
+            </p>
+            <div id="batch-similarity-list" style="display: flex; flex-direction: column; gap: 10px;"></div>
+        </div>
         
         <div class="card" style="overflow-x: auto;">
             <div class="card-title">
@@ -1269,9 +1340,7 @@
                         <th style="width: 80px;">Wynik</th>
                     </tr>
                 </thead>
-                <tbody id="batch-table-body">
-                    
-                </tbody>
+                <tbody id="batch-table-body"></tbody>
             </table>
         </div>
     </div>
@@ -1290,13 +1359,14 @@
 </div>
 
 <footer class="footer">
+    <p>TextScope &copy; 2026 | Projekt NLP wykonany jako zaawansowana praca zaliczeniowa</p>
 </footer>
 
 <script>
-
 let currentTab = 'sentiment';
 let emotionsChart = null;
 let batchChart = null;
+let sentencesChart = null;
 let isCompareMode = false;
 let selectedFile = null;
 let lastAnalyzedData = null;
@@ -1354,7 +1424,6 @@ function switchTab(tab) {
             document.getElementById('compare-toggle-btn').style.display = '';
             document.getElementById('analyze-btn').textContent = isCompareMode ? '✨ Porównaj teksty' : '✨ Analizuj tekst';
         } else {
-
             if (isCompareMode) toggleCompareMode();
             document.getElementById('card-title-text').textContent = 'Sprawdzenie tekstu pod kątem AI';
             document.getElementById('input-icon').textContent = '🤖';
@@ -1367,17 +1436,115 @@ function switchTab(tab) {
 }
 
 function setExample(key) {
-    document.getElementById('text-input').value = examples[key];
+    const input = document.getElementById('text-input');
+    input.innerText = examples[key];
     updateCounters();
 }
 
 function updateCounters() {
-    const txt = document.getElementById('text-input').value;
+    const txt = document.getElementById('text-input').innerText;
     document.getElementById('char-counter').textContent = txt.length;
     const words = txt.trim() ? txt.trim().split(/\s+/).length : 0;
     document.getElementById('word-counter').textContent = words;
 }
 document.getElementById('text-input').addEventListener('input', updateCounters);
+
+// REAL-TIME Word Highlight caret position handlers
+function getCaretCharacterOffsetWithin(element) {
+    let caretOffset = 0;
+    const doc = element.ownerDocument || element.document;
+    const win = doc.defaultView || doc.parentWindow;
+    let sel;
+    if (typeof win.getSelection != "undefined") {
+        sel = win.getSelection();
+        if (sel.rangeCount > 0) {
+            const range = win.getSelection().getRangeAt(0);
+            const preCaretRange = range.cloneRange();
+            preCaretRange.selectNodeContents(element);
+            preCaretRange.setEnd(range.endContainer, range.endOffset);
+            caretOffset = preCaretRange.toString().length;
+        }
+    }
+    return caretOffset;
+}
+
+function setCaretPosition(element, offset) {
+    let charIndex = 0;
+    const range = document.createRange();
+    range.setStart(element, 0);
+    range.collapse(true);
+    const nodeStack = [element];
+    let node;
+    let found = false;
+    let stop = false;
+
+    while (!stop && (node = nodeStack.pop())) {
+        if (node.nodeType == 3) {
+            const nextCharIndex = charIndex + node.length;
+            if (!found && offset >= charIndex && offset <= nextCharIndex) {
+                range.setStart(node, offset - charIndex);
+                range.setEnd(node, offset - charIndex);
+                found = true;
+                stop = true;
+            }
+            charIndex = nextCharIndex;
+        } else {
+            let i = node.childNodes.length;
+            while (i--) {
+                nodeStack.push(node.childNodes[i]);
+            }
+        }
+    }
+
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+}
+
+// DEBOUNCED real-time highlight coloring
+let debounceTimer;
+document.getElementById('text-input').addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    updateCounters();
+    
+    // Only perform real-time highlight if in single sentiment tab
+    if (currentTab !== 'sentiment' || isCompareMode) return;
+    
+    debounceTimer = setTimeout(async () => {
+        const div = document.getElementById('text-input');
+        const text = div.innerText.trim();
+        if (text.length < 10) return;
+        
+        const caretOffset = getCaretCharacterOffsetWithin(div);
+        
+        try {
+            const res = await fetch('/analyze', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ text, type: 'sentiment' })
+            });
+            const data = await res.json();
+            if (data.words) {
+                let html = '';
+                for (const w of data.words) {
+                    if (w.type === 'space') {
+                        html += w.text;
+                    } else if (w.type === 'positive') {
+                        html += `<span class="w-pos" style="background: rgba(74,222,128,0.18); color: #4ade80; padding: 2px 4px; border-radius: 4px; font-weight: 600;">${w.text}</span>`;
+                    } else if (w.type === 'negative') {
+                        html += `<span class="w-neg" style="background: rgba(248,113,113,0.18); color: #f87171; padding: 2px 4px; border-radius: 4px; font-weight: 600;">${w.text}</span>`;
+                    } else {
+                        html += w.text;
+                    }
+                }
+                div.innerHTML = html;
+                try {
+                    setCaretPosition(div, caretOffset);
+                } catch (ce) {}
+            }
+        } catch (e) {}
+    }, 800);
+});
 
 function toggleCompareMode() {
     isCompareMode = !isCompareMode;
@@ -1418,7 +1585,7 @@ async function analyzeText() {
         return;
     }
 
-    const text = document.getElementById('text-input').value.trim();
+    const text = document.getElementById('text-input').innerText.trim();
     if (!text) { shakeButton(); return; }
 
     document.getElementById('loading').classList.add('show');
@@ -1445,8 +1612,14 @@ async function analyzeText() {
             ...data
         };
 
-        if (currentTab === 'sentiment') showSentimentResults(data);
-        else showAIResults(data);
+        if (currentTab === 'sentiment') {
+            showSentimentResults(data);
+            
+            // FETCH advanced features in parallel to keep it snappy!
+            fetchAdvancedFeatures(text);
+        } else {
+            showAIResults(data);
+        }
 
         saveToHistory(text, currentTab, data);
 
@@ -1456,6 +1629,118 @@ async function analyzeText() {
         document.getElementById('loading').classList.remove('show');
         document.getElementById('analyze-btn').disabled = false;
     }
+}
+
+async function fetchAdvancedFeatures(text) {
+    // 1. Fetch Sentences Sentiment Chart
+    try {
+        const res = await fetch('/analyze_sentences', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ text })
+        });
+        const data = await res.json();
+        if (data.sentences && data.sentences.length > 0) {
+            renderSentencesChart(data.sentences);
+            document.getElementById('sentences-chart-card').style.display = 'block';
+        } else {
+            document.getElementById('sentences-chart-card').style.display = 'none';
+        }
+    } catch (e) {
+        document.getElementById('sentences-chart-card').style.display = 'none';
+    }
+
+    // 2. Fetch LSA Text Summary
+    try {
+        const res = await fetch('/summarize', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ text })
+        });
+        const data = await res.json();
+        if (data.summary && data.summary.length > 0) {
+            const listEl = document.getElementById('summary-sentences-list');
+            listEl.innerHTML = data.summary.map(s => `<div style="padding:10px 14px; background:rgba(124,92,252,0.06); border-left:3px solid var(--accent-1); border-radius:4px; font-size:13px; line-height:1.5;">✨ ${s}</div>`).join('');
+            document.getElementById('summary-card').style.display = 'block';
+        } else {
+            document.getElementById('summary-card').style.display = 'none';
+        }
+    } catch (e) {
+        document.getElementById('summary-card').style.display = 'none';
+    }
+
+    // 3. Fetch Grammar Checker
+    try {
+        const res = await fetch('/grammar_check', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ text })
+        });
+        const data = await res.json();
+        if (data.errors && data.errors.length > 0) {
+            const listEl = document.getElementById('grammar-errors-list');
+            listEl.innerHTML = data.errors.map(err => `
+                <div style="padding:12px; background:rgba(248,113,113,0.06); border:1px solid rgba(248,113,113,0.15); border-radius:6px; font-size:13px; line-height:1.5;">
+                    ❌ Wyraz: <strong style="color:var(--negative); text-decoration:line-through;">"${err.bad}"</strong><br>
+                    💡 Porada: <span style="color:var(--text-secondary);">${err.message}</span><br>
+                    ✨ Sugestie: ${err.suggestions.map(s => `<strong style="color:var(--positive); margin-right:6px;">${s}</strong>`).join(', ') || 'brak'}
+                </div>
+            `).join('');
+            document.getElementById('grammar-card').style.display = 'block';
+        } else {
+            const listEl = document.getElementById('grammar-errors-list');
+            listEl.innerHTML = `<div style="padding:10px 14px; background:rgba(74,222,128,0.06); border-left:3px solid var(--positive); border-radius:4px; font-size:13px; color:#4ade80;">✅ Brak wykrytych błędów gramatycznych w tekście!</div>`;
+            document.getElementById('grammar-card').style.display = 'block';
+        }
+    } catch (e) {
+        document.getElementById('grammar-card').style.display = 'none';
+    }
+}
+
+function renderSentencesChart(sentences) {
+    if (sentencesChart) { sentencesChart.destroy(); sentencesChart = null; }
+
+    const ctx = document.getElementById('sentences-chart').getContext('2d');
+    const labels = sentences.map((_, i) => `Zdanie ${i + 1}`);
+    const data = sentences.map(s => s.sentiment_score);
+    const pointColors = sentences.map(s => s.sentiment_score > 0.1 ? '#4ade80' : (s.sentiment_score < -0.1 ? '#f87171' : '#facc15'));
+
+    sentencesChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Tonalność zdania',
+                data: data,
+                borderColor: '#7c5cfc',
+                borderWidth: 3,
+                pointBackgroundColor: pointColors,
+                pointBorderColor: '#0f0f1a',
+                pointBorderWidth: 2,
+                pointRadius: 6,
+                pointHoverRadius: 8,
+                fill: false,
+                tension: 0.2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: {
+                    min: -1.0,
+                    max: 1.0,
+                    grid: { color: 'rgba(255,255,255,0.06)' },
+                    ticks: { color: 'rgba(255,255,255,0.5)', font: { family: 'Inter' } }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { color: 'rgba(255,255,255,0.5)', font: { family: 'Inter', size: 10 } }
+                }
+            }
+        }
+    });
 }
 
 async function compareTexts() {
@@ -1561,9 +1846,7 @@ function showSentimentResults(data) {
     }
 
     renderWordHighlights(data.words);
-
     renderEmotions(data.emotions);
-
     renderStats(data.stats, 's-stats-grid', 's-top-words-section');
 
     document.getElementById('sentiment-results').classList.add('show');
@@ -1765,9 +2048,27 @@ function showCompareResults(data) {
     sDiffEl.textContent = (sentDiff > 0 ? '+' : '') + sentDiff;
     sDiffEl.style.color = sentDiff > 0.05 ? 'var(--positive)' : (sentDiff < -0.05 ? 'var(--negative)' : 'var(--neutral)');
     
+    const sArrow = document.getElementById('comp-sent-diff-arrow');
+    if (sentDiff > 0.05) {
+        sArrow.innerHTML = `<span style="color:var(--positive)">▲ Lepsza tonalność o ${(sentDiff * 100).toFixed(0)}%</span>`;
+    } else if (sentDiff < -0.05) {
+        sArrow.innerHTML = `<span style="color:var(--negative)">▼ Gorsza tonalność o ${Math.abs(sentDiff * 100).toFixed(0)}%</span>`;
+    } else {
+        sArrow.innerHTML = `<span>⚖️ Prawie bez zmian</span>`;
+    }
+    
     const aiDiffEl = document.getElementById('comp-ai-diff');
     aiDiffEl.textContent = (aiDiff > 0 ? '+' : '') + aiDiff + '%';
     aiDiffEl.style.color = aiDiff > 5 ? 'var(--negative)' : (aiDiff < -5 ? 'var(--positive)' : 'var(--neutral)');
+    
+    const aiArrow = document.getElementById('comp-ai-diff-arrow');
+    if (aiDiff > 5) {
+        aiArrow.innerHTML = `<span style="color:var(--negative)">▲ Większa sztuczność (AI) o ${aiDiff}%</span>`;
+    } else if (aiDiff < -5) {
+        aiArrow.innerHTML = `<span style="color:var(--positive)">▼ Bardziej ludzki tekst o ${Math.abs(aiDiff)}%</span>`;
+    } else {
+        aiArrow.innerHTML = `<span>⚖️ Porównywalna struktura AI</span>`;
+    }
     
     document.getElementById('comp-len-diff').textContent = (lenDiff > 0 ? '+' : '') + lenDiff;
     
@@ -1811,6 +2112,20 @@ function showCompareResults(data) {
     
     document.getElementById('compare-results').style.display = 'block';
     document.getElementById('compare-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function exportJSON() {
+    if (!lastAnalyzedData) {
+        alert('Brak danych do wygenerowania eksportu. Najpierw przeprowadź analizę.');
+        return;
+    }
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(lastAnalyzedData, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", "textscope_analysis.json");
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
 }
 
 function exportReport(type) {
@@ -1964,6 +2279,25 @@ function showBatchResults(data) {
     }
     tbody.innerHTML = html;
     
+    // Member clustering list
+    if (summary.similarity_clusters && summary.similarity_clusters.length > 0) {
+        const listEl = document.getElementById('batch-similarity-list');
+        let clustersHtml = '';
+        for (const cluster of summary.similarity_clusters) {
+            const members = cluster.review_indices.map(idx => `<span style="background:rgba(255,255,255,0.06); padding:2px 8px; border-radius:4px; border:1px solid var(--border-color); font-weight:600;">Wiersz ${data.results[idx].row}</span>`).join(' ');
+            clustersHtml += `
+                <div style="padding:12px; background:rgba(200,76,255,0.05); border:1px solid rgba(200,76,255,0.15); border-radius:8px; font-size:13px; line-height:1.5;">
+                    💡 <strong>Grupa podobieństwa #${cluster.cluster_id}:</strong><br>
+                    <div style="margin-top:6px; display:flex; flex-wrap:wrap; gap:6px;">${members}</div>
+                </div>
+            `;
+        }
+        listEl.innerHTML = clustersHtml;
+        document.getElementById('batch-similarity-card').style.display = 'block';
+    } else {
+        document.getElementById('batch-similarity-card').style.display = 'none';
+    }
+    
     document.getElementById('batch-results').style.display = 'block';
     document.getElementById('batch-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -2080,7 +2414,7 @@ function loadFromHistory(index) {
     if (history[index]) {
         const h = history[index];
         switchTab(h.type);
-        document.getElementById('text-input').value = h.fullText;
+        document.getElementById('text-input').innerText = h.fullText;
         updateCounters();
     }
 }
@@ -2101,6 +2435,7 @@ function toggleHistory() {
 
 renderHistory();
 
+// Ctrl + Enter shortcut execution
 document.getElementById('text-input').addEventListener('keydown', function(e) {
     if (e.ctrlKey && e.key === 'Enter') {
         e.preventDefault();

@@ -1,0 +1,15 @@
+# Auto-detect text files and normalize their line endings to LF in the repository
+* text=auto
+
+# Explicitly declare files that should always use LF (UNIX line endings)
+*.py text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+.gitignore text eol=lf
+Dockerfile text eol=lf
+LICENSE text eol=lf
