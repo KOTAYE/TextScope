@@ -33,6 +33,7 @@ nltk.download('averaged_perceptron_tagger_eng', quiet=True)
 
 # Global configuration variables
 SECRET_KEY: str = os.getenv("SECRET_KEY", "textscope-super-secret-key-2026")
+GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
 
 # Global analyzer instance
 sid: SentimentIntensityAnalyzer = SentimentIntensityAnalyzer()

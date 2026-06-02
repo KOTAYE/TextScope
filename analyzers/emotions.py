@@ -16,41 +16,53 @@ EMOTION_WORDS: Dict[str, list[str]] = {
         'superb', 'outstanding', 'magnificent', 'thrilled', 'excited', 'paradise',
         'heaven', 'bliss', 'ecstatic', 'lovely', 'adore', 'charming', 'bright',
         'good', 'nice', 'liked', 'like', 'recommend', 'favorite', 'favourite',
-        'worth', 'friendly', 'helpful', 'welcoming', 'comfortable', 'cozy'
+        'worth', 'friendly', 'helpful', 'welcoming', 'comfortable', 'cozy',
+        'wspanial', 'swietn', 'dobr', 'polecam', 'super', 'pyszn', 'smaczn', 'mil',
+        'koch', 'ladn', 'przyjemn', 'ideal', 'zadowol', 'ekstra', 'fajn',
+        'чудов', 'класн', 'гарн', 'чист', 'приємн', 'ідеал', 'задовол', 'люблю', 'кохаю'
     ],
     'anger': [
         'angry', 'hate', 'terrible', 'horrible', 'worst', 'awful', 'furious',
         'annoyed', 'frustrated', 'rage', 'disgusting', 'outrageous', 'rude',
         'unacceptable', 'pathetic', 'infuriating', 'irritating', 'mad', 'pissed',
         'hostile', 'aggressive', 'violent', 'cruel', 'brutal', 'ruthless',
-        'disrespectful', 'insulting', 'offensive', 'abusive', 'toxic'
+        'disrespectful', 'insulting', 'offensive', 'abusive', 'toxic',
+        'zly', 'kiepsk', 'okropn', 'traged', 'dramat', 'fatal', 'niemil', 'brud',
+        'porazka', 'koszmar', 'najgorsz', 'wstretn', 'поган', 'жахлив', 'драм', 
+        'жах', 'кошмар', 'найгірш', 'ненавиджу'
     ],
     'sadness': [
         'sad', 'unhappy', 'disappointed', 'depressed', 'miserable', 'sorry',
         'regret', 'unfortunate', 'gloomy', 'heartbroken', 'cry', 'tears',
         'lonely', 'lost', 'grief', 'mourn', 'sorrow', 'melancholy', 'hopeless',
         'devastated', 'tragic', 'painful', 'suffering', 'despair', 'empty',
-        'miss', 'missing', 'gone', 'abandoned', 'forgotten'
+        'miss', 'missing', 'gone', 'abandoned', 'forgotten',
+        'smutn', 'zal', 'przykro', 'depres', 'plak', 'zawiedz', 'rozczar',
+        'сумн', 'жаль', 'плак', 'розчар'
     ],
     'fear': [
         'scared', 'afraid', 'terrified', 'worried', 'anxious', 'nervous',
         'panic', 'horror', 'dread', 'frightened', 'alarmed', 'concerned',
         'uneasy', 'threatened', 'danger', 'dangerous', 'risk', 'risky',
         'creepy', 'spooky', 'eerie', 'haunted', 'nightmare', 'phobia',
-        'terror', 'intimidating', 'suspicious', 'paranoid'
+        'terror', 'intimidating', 'suspicious', 'paranoid',
+        'strach', 'boj', 'przera', 'niepok', 'groz', 'niebezp', 'lek',
+        'страх', 'боюсь', 'небезпек'
     ],
     'surprise': [
         'surprised', 'shocked', 'amazed', 'astonished', 'unexpected',
         'wow', 'incredible', 'unbelievable', 'stunning', 'remarkable',
         'speechless', 'mind-blowing', 'jaw-dropping', 'extraordinary',
         'phenomenal', 'startled', 'bewildered', 'awestruck', 'whoa',
-        'omg', 'unreal', 'insane', 'crazy'
+        'omg', 'unreal', 'insane', 'crazy',
+        'zaskocz', 'niespodz', 'szok', 'wow', 'incredible', 'див', 'шок', 'сюрприз'
     ],
     'disgust': [
         'disgusting', 'gross', 'nasty', 'repulsive', 'revolting', 'sickening',
         'vile', 'yuck', 'eww', 'filthy', 'dirty', 'contaminated', 'rotten',
         'stinky', 'smelly', 'moldy', 'spoiled', 'foul', 'putrid', 'nauseating',
-        'repugnant', 'hideous', 'grotesque', 'trash', 'garbage', 'waste'
+        'repugnant', 'hideous', 'grotesque', 'trash', 'garbage', 'waste',
+        'obrzyd', 'ohyd', 'wstret', 'brudn', 'огид', 'брудн', 'гид'
     ]
 }
 

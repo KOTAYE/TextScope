@@ -901,22 +901,34 @@
         </div>
 
         <div class="examples" id="examples-sentiment">
-            <div class="examples-label">Wypróbuj przykład</div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; width: 100%;">
+                <div class="examples-label" style="margin-bottom:0;">Generuj przykład (Gemini AI)</div>
+                <div style="display: flex; gap: 6px;">
+                    <button class="lang-btn" id="sent-lang-pl" onclick="changeGenLanguage('pl')" style="background: rgba(124, 92, 252, 0.2); border: 1px solid #7c5cfc; color: white; padding: 4px 10px; border-radius: 6px; font-size: 11px; cursor: pointer; font-weight:600; display: flex; align-items: center; gap: 4px; transition: all 0.2s;">🇵🇱 PL</button>
+                    <button class="lang-btn" id="sent-lang-en" onclick="changeGenLanguage('en')" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: var(--text-secondary); padding: 4px 10px; border-radius: 6px; font-size: 11px; cursor: pointer; font-weight:600; display: flex; align-items: center; gap: 4px; transition: all 0.2s;">🇬🇧 EN</button>
+                </div>
+            </div>
             <div class="example-chips">
-                <button class="example-chip" onclick="setExample('pos')">👍 Pozytywna opinia</button>
-                <button class="example-chip" onclick="setExample('neg')">👎 Negatywna opinia</button>
-                <button class="example-chip" onclick="setExample('mixed')">🤔 Mieszana opinia</button>
-                <button class="example-chip" onclick="setExample('neutral')">😐 Neutralny</button>
+                <button class="example-chip" onclick="fetchDynamicExample('pos')">👍 Pozytywna opinia</button>
+                <button class="example-chip" onclick="fetchDynamicExample('neg')">👎 Negatywna opinia</button>
+                <button class="example-chip" onclick="fetchDynamicExample('mixed')">🤔 Mieszana opinia</button>
+                <button class="example-chip" onclick="fetchDynamicExample('neutral')">😐 Neutralny</button>
             </div>
         </div>
 
         <div class="examples" id="examples-ai" style="display:none;">
-            <div class="examples-label">Wypróbuj przykład</div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; width: 100%;">
+                <div class="examples-label" style="margin-bottom:0;">Generuj przykład (Gemini AI)</div>
+                <div style="display: flex; gap: 6px;">
+                    <button class="lang-btn" id="ai-lang-pl" onclick="changeGenLanguage('pl')" style="background: rgba(124, 92, 252, 0.2); border: 1px solid #7c5cfc; color: white; padding: 4px 10px; border-radius: 6px; font-size: 11px; cursor: pointer; font-weight:600; display: flex; align-items: center; gap: 4px; transition: all 0.2s;">🇵🇱 PL</button>
+                    <button class="lang-btn" id="ai-lang-en" onclick="changeGenLanguage('en')" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: var(--text-secondary); padding: 4px 10px; border-radius: 6px; font-size: 11px; cursor: pointer; font-weight:600; display: flex; align-items: center; gap: 4px; transition: all 0.2s;">🇬🇧 EN</button>
+                </div>
+            </div>
             <div class="example-chips">
-                <button class="example-chip" onclick="setExample('ai1')">🤖 Tekst ChatGPT</button>
-                <button class="example-chip" onclick="setExample('ai2')">🤖 Formalny AI</button>
-                <button class="example-chip" onclick="setExample('human1')">👤 Tekst człowieka</button>
-                <button class="example-chip" onclick="setExample('human2')">👤 Nieformalny</button>
+                <button class="example-chip" onclick="fetchDynamicExample('ai1')">🤖 ChatGPT / AI</button>
+                <button class="example-chip" onclick="fetchDynamicExample('ai2')">🤖 Formalny AI</button>
+                <button class="example-chip" onclick="fetchDynamicExample('human1')">👤 Tekst człowieka</button>
+                <button class="example-chip" onclick="fetchDynamicExample('human2')">👤 Nieformalny</button>
             </div>
         </div>
 
@@ -1101,6 +1113,19 @@
                 <span>Inteligentne wskazówki i rekomendacje</span>
             </div>
             <div class="recommendations-list" id="s-recommendations-list" style="display: flex; flex-direction: column; gap: 10px;"></div>
+        </div>
+
+        <div class="card" id="llm-analysis-card" style="display:none;">
+            <div class="card-title">
+                <div class="icon">🤖</div>
+                <span>Zaawansowana interpretacja semantyczna (Gemini AI)</span>
+            </div>
+            <p style="color: var(--text-secondary); font-size: 12px; margin-bottom: 12px;">
+                Analiza ukrytych intencji, tonu oraz sarkazmu generowana w czasie rzeczywistym przez model językowy LLM:
+            </p>
+            <div style="padding: 14px; background: rgba(200, 76, 255, 0.08); border: 1px solid rgba(200, 76, 255, 0.2); border-radius: 8px; font-size: 13.5px; line-height: 1.5; color: var(--text-primary);">
+                💡 <span id="llm-analysis-text"></span>
+            </div>
         </div>
 
         <div class="note">
@@ -1377,6 +1402,93 @@ let sentencesChart = null;
 let isCompareMode = false;
 let selectedFile = null;
 let lastAnalyzedData = null;
+
+let generationLanguage = 'pl';
+
+function changeGenLanguage(lang) {
+    generationLanguage = lang;
+    
+    // Update button styles in sentiment tab
+    const plSentBtn = document.getElementById('sent-lang-pl');
+    const enSentBtn = document.getElementById('sent-lang-en');
+    const plAiBtn = document.getElementById('ai-lang-pl');
+    const enAiBtn = document.getElementById('ai-lang-en');
+    
+    if (lang === 'pl') {
+        plSentBtn.style.background = 'rgba(124, 92, 252, 0.2)';
+        plSentBtn.style.borderColor = '#7c5cfc';
+        plSentBtn.style.color = 'white';
+        
+        enSentBtn.style.background = 'rgba(255, 255, 255, 0.05)';
+        enSentBtn.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+        enSentBtn.style.color = 'var(--text-secondary)';
+        
+        plAiBtn.style.background = 'rgba(124, 92, 252, 0.2)';
+        plAiBtn.style.borderColor = '#7c5cfc';
+        plAiBtn.style.color = 'white';
+        
+        enAiBtn.style.background = 'rgba(255, 255, 255, 0.05)';
+        enAiBtn.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+        enAiBtn.style.color = 'var(--text-secondary)';
+    } else {
+        enSentBtn.style.background = 'rgba(124, 92, 252, 0.2)';
+        enSentBtn.style.borderColor = '#7c5cfc';
+        enSentBtn.style.color = 'white';
+        
+        plSentBtn.style.background = 'rgba(255, 255, 255, 0.05)';
+        plSentBtn.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+        plSentBtn.style.color = 'var(--text-secondary)';
+        
+        enAiBtn.style.background = 'rgba(124, 92, 252, 0.2)';
+        enAiBtn.style.borderColor = '#7c5cfc';
+        enAiBtn.style.color = 'white';
+        
+        plAiBtn.style.background = 'rgba(255, 255, 255, 0.05)';
+        plAiBtn.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+        plAiBtn.style.color = 'var(--text-secondary)';
+    }
+}
+
+function fetchDynamicExample(type) {
+    const input = document.getElementById('text-input');
+    const prevText = input.innerText;
+    input.innerText = generationLanguage === 'pl' ? 'Generowanie przykładu przez Gemini AI...' : 'Generating example via Gemini AI...';
+    
+    // Disable chips temporarily during fetch
+    const chips = document.querySelectorAll('.example-chip');
+    chips.forEach(c => c.disabled = true);
+    
+    fetch('/generate_example', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            language: generationLanguage,
+            type: type
+        })
+    })
+    .then(res => {
+        if (!res.ok) throw new Error('Błąd serwera');
+        return res.json();
+    })
+    .then(data => {
+        input.innerText = data.text;
+        updateCounters();
+        
+        // Trigger highlight if in real-time mode
+        if (typeof handleRealTimeHighlight === 'function') {
+            handleRealTimeHighlight();
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        input.innerText = prevText;
+    })
+    .finally(() => {
+        chips.forEach(c => c.disabled = false);
+    });
+}
 
 const examples = {
     pos: "This restaurant is absolutely amazing! The food was incredibly delicious, and the staff was so friendly and welcoming. I had the best pasta I've ever tasted. The atmosphere was warm and cozy with beautiful decorations. Our waiter was attentive and made great recommendations. We'll definitely be coming back every week! Highly recommend to everyone looking for an unforgettable dining experience.",
@@ -1850,6 +1962,13 @@ function showSentimentResults(data) {
         document.getElementById('s-recommendations-card').style.display = 'block';
     } else {
         document.getElementById('s-recommendations-card').style.display = 'none';
+    }
+
+    if (data.llm_analysis) {
+        document.getElementById('llm-analysis-text').textContent = data.llm_analysis.explanation;
+        document.getElementById('llm-analysis-card').style.display = 'block';
+    } else {
+        document.getElementById('llm-analysis-card').style.display = 'none';
     }
 
     renderWordHighlights(data.words);
@@ -2427,10 +2546,8 @@ function loadFromHistory(index) {
 }
 
 function clearHistory() {
-    if (confirm('Wyczyścić całą historię?')) {
-        localStorage.removeItem('textscope_history');
-        renderHistory();
-    }
+    localStorage.removeItem('textscope_history');
+    renderHistory();
 }
 
 function toggleHistory() {

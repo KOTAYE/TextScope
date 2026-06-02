@@ -124,3 +124,61 @@ def test_analyze_batch_route(client):
     assert 'summary' in data
     assert 'results' in data
     assert data['summary']['total_reviews'] == 2
+
+def test_analyze_sentiment_route_with_llm_emotions(client):
+    mock_llm = {
+        "sentiment_score": 0.9,
+        "category": "Pozytywny",
+        "subjectivity": 30.0,
+        "explanation": "Świetna opinia.",
+        "emotions": {
+            "joy": 95.0,
+            "anger": 1.0,
+            "sadness": 0.0,
+            "fear": 0.0,
+            "surprise": 4.0,
+            "disgust": 0.0
+        },
+        "topics": {
+            "obsługa": { "keywords": ["kelner"], "relevance": 80.0 }
+        },
+        "recommendations": [
+            "Dobra robota."
+        ]
+    }
+    with patch('app.analyze_text_with_llm', return_value=mock_llm):
+        res = client.post('/analyze', json={
+            'text': 'To jest test.',
+            'type': 'sentiment'
+        })
+        assert res.status_code == 200
+        data = res.get_json()
+        assert 'emotions' in data
+        assert data['emotions']['dominant'] == 'joy'
+        assert data['emotions']['scores']['joy'] == 95.0
+        assert data['emotions']['scores']['surprise'] == 4.0
+        assert data['emotions']['dominant_name'] == 'Radość'
+        assert data['emotions']['dominant_emoji'] == '😄'
+        
+        # Verify overridden sentiment
+        assert data['sentiment']['combined_score'] == 0.9
+        assert data['sentiment']['category'] == 'Pozytywny'
+        assert data['sentiment']['textblob']['subjectivity'] == 30.0
+        assert data['sentiment']['vader']['compound'] == 0.9
+        assert data['sentiment']['vader']['positive'] == 90.0
+        
+        # Verify overridden topics
+        assert data['topics']['categories']['obsługa']['relevance'] == 80.0
+        
+        # Verify overridden recommendations
+        assert data['recommendations'] == ["Dobra robota."]
+
+def test_generate_example_route(client):
+    res = client.post('/generate_example', json={
+        'language': 'pl',
+        'type': 'pos'
+    })
+    assert res.status_code == 200
+    data = res.get_json()
+    assert 'text' in data
+    assert 'source' in data

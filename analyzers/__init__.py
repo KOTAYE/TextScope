@@ -13,8 +13,10 @@ from .ai_detection import detect_ai_text
 from .summarizer import summarize_text
 from .clustering import cluster_reviews
 from .grammar import check_grammar
+from .llm_analysis import analyze_text_with_llm
 
 __all__ = [
+    'analyze_text_with_llm',
     'detect_language',
     'analyze_sentiment',
     'get_word_sentiments',

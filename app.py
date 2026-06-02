@@ -27,7 +27,8 @@ from analyzers import (
     analyze_sentences_sentiment,
     summarize_text,
     cluster_reviews,
-    check_grammar
+    check_grammar,
+    analyze_text_with_llm
 )
 from utils import (
     generate_sentiment_recommendations,
@@ -65,11 +66,107 @@ def analyze() -> Response:
     if analysis_type == 'sentiment':
         sentiment = analyze_sentiment(text)
         words = get_word_sentiments(text)
-        emotions = detect_emotions(text)
         stats = get_text_stats(text)
         topics = extract_topics(text)
         language = detect_language(text)
-        recommendations = generate_sentiment_recommendations(sentiment, emotions)
+        
+        # Call Google Gemini API if configured
+        llm_analysis = analyze_text_with_llm(text)
+        
+        # Initialize emotions using local keyword analysis
+        emotions = detect_emotions(text)
+        
+        # If Gemini AI returned valid analysis, override local sentiment, emotions, topics, and recommendations!
+        if llm_analysis:
+            # 1. Overriding emotions
+            if isinstance(llm_analysis.get('emotions'), dict):
+                ai_emotions = llm_analysis['emotions']
+                ai_emotions_lower = {str(k).lower().strip(): v for k, v in ai_emotions.items()}
+                required_keys = ['joy', 'anger', 'sadness', 'fear', 'surprise', 'disgust']
+                if all(k in ai_emotions_lower for k in required_keys):
+                    emoji_map = {
+                        'joy': '😄', 'anger': '😡', 'sadness': '😢',
+                        'fear': '😨', 'surprise': '😲', 'disgust': '🤢'
+                    }
+                    name_map = {
+                        'joy': 'Radość', 'anger': 'Złość', 'sadness': 'Smutek',
+                        'fear': 'Strach', 'surprise': 'Zaskoczenie', 'disgust': 'Obrzydzenie'
+                    }
+                    try:
+                        scores = {k: round(float(ai_emotions_lower[k]), 1) for k in required_keys}
+                        dominant = max(scores, key=scores.get) if any(v > 0 for v in scores.values()) else None
+                        emotions = {
+                            'scores': scores,
+                            'dominant': dominant,
+                            'dominant_name': name_map.get(dominant, '—'),
+                            'dominant_emoji': emoji_map.get(dominant, '😐')
+                        }
+                    except (ValueError, TypeError):
+                        pass
+
+            # 2. Overriding sentiment
+            ai_score = llm_analysis.get('sentiment_score')
+            ai_category = llm_analysis.get('category')
+            ai_subjectivity = llm_analysis.get('subjectivity', 0.0)
+            if ai_score is not None and ai_category is not None:
+                try:
+                    score = round(float(ai_score), 3)
+                    pos_pct = round(max(0.0, score * 100.0), 1)
+                    neg_pct = round(max(0.0, -score * 100.0), 1)
+                    neu_pct = round(100.0 - pos_pct - neg_pct, 1)
+                    
+                    emoji_val = "😐"
+                    if score >= 0.1:
+                        emoji_val = "😊"
+                    elif score <= -0.1:
+                        emoji_val = "😢"
+                        
+                    sentiment = {
+                        'score': score,
+                        'combined_score': score,
+                        'category': str(ai_category),
+                        'emoji': emoji_val,
+                        'positive_pct': pos_pct,
+                        'negative_pct': neg_pct,
+                        'neutral_pct': neu_pct,
+                        'vader': {
+                            'positive': pos_pct,
+                            'negative': neg_pct,
+                            'neutral': neu_pct,
+                            'compound': score
+                        },
+                        'textblob': {
+                            'polarity': score,
+                            'subjectivity': round(float(ai_subjectivity), 1)
+                        }
+                    }
+                except (ValueError, TypeError):
+                    pass
+
+            # 3. Overriding topics
+            ai_topics = llm_analysis.get('topics')
+            if isinstance(ai_topics, dict):
+                try:
+                    topics = {
+                        'categories': {
+                            k: {
+                                'keywords': [str(x) for x in v.get('keywords', [])],
+                                'relevance': round(float(v.get('relevance', 0.0)), 1)
+                            }
+                            for k, v in ai_topics.items()
+                        }
+                    }
+                except (ValueError, TypeError, AttributeError):
+                    pass
+
+            # 4. Overriding recommendations
+            ai_recs = llm_analysis.get('recommendations')
+            if isinstance(ai_recs, list) and len(ai_recs) > 0:
+                recommendations = [str(r) for r in ai_recs]
+            else:
+                recommendations = generate_sentiment_recommendations(sentiment, emotions)
+        else:
+            recommendations = generate_sentiment_recommendations(sentiment, emotions)
 
         return jsonify({
             'sentiment': sentiment,
@@ -78,7 +175,8 @@ def analyze() -> Response:
             'stats': stats,
             'topics': topics,
             'language': language,
-            'recommendations': recommendations
+            'recommendations': recommendations,
+            'llm_analysis': llm_analysis
         })
 
     elif analysis_type == 'ai_detect':
@@ -536,6 +634,97 @@ def export_report() -> Response:
         mimetype='text/html',
         headers={'Content-Disposition': 'inline; filename=raport_analizy.html'}
     )
+
+@app.route('/generate_example', methods=['POST'])
+def generate_example_route() -> Response:
+    """
+    Generates a realistic text example dynamically via Google Gemini API
+    based on requested language and category type.
+    """
+    data = request.get_json() or {}
+    lang = str(data.get('language', 'pl')).strip().lower()
+    example_type = str(data.get('type', 'pos')).strip().lower()
+
+    # Pre-defined prompts for Gemini
+    prompts_map = {
+        'pl': {
+            'pos': "Wygeneruj realistyczną, naturalną, krótką (2-4 zdania) opinię/recenzję po polsku, która jest bardzo pozytywna (np. o restauracji, hotelu lub produkcie). Zwróć tylko wygenerowany tekst i nic więcej.",
+            'neg': "Wygeneruj realistyczną, naturalną, krótką (2-4 zdania) opinię/recenzję po polsku, która jest bardzo negatywna, rozczarowana i krytyczna. Zwróć tylko wygenerowany tekst i nic więcej.",
+            'mixed': "Wygeneruj krótką (2-4 zdania) opinię po polsku, która ma charakter mieszany (częściowo chwali, a częściowo krytykuje produkt lub usługę). Zwróć tylko wygenerowany tekst i nic więcej.",
+            'neutral': "Wygeneruj w pełni neutralny, krótki (2-4 zdania) tekst informacyjny po polsku (np. godziny otwarcia biura, fakty naukowe, opis lokalizacji). Zwróć tylko wygenerowany tekst i nic więcej.",
+            'ai1': "Wygeneruj krótki (3-5 zdań) tekst o zaawansowanej technologii lub nauce po polsku, napisany w sposób bardzo formalny, bezosobowy, z użyciem słów takich jak 'ponadto', 'warto zauważyć', 'podsumowując' - typowy dla generowania przez ChatGPT. Zwróć tylko wygenerowany tekst i nic więcej.",
+            'ai2': "Wygeneruj krótki (3-5 zdań) tekst naukowy lub biznesowy po polsku, o wysokim stopniu formalności i monotonnej strukturze zdań typowej dla modeli językowych AI. Zwróć tylko wygenerowany tekst i nic więcej.",
+            'human1': "Wygeneruj krótki (2-4 zdania) komentarz po polsku napisany przez prawdziwego człowieka w sposób bardzo nieformalny, potoczny, ze skrótami (np. lol, w sumie, spoko, nwm) i brakiem wielkich liter. Zwróć tylko wygenerowany tekst.",
+            'human2': "Wygeneruj krótki (2-4 zdania) emocjonalny wpis na bloga lub social media po polsku, z typowo ludzkim, ekspresyjnym stylem pisania, slangiem i wykrzyknikami. Zwróć tylko wygenerowany tekst."
+        },
+        'en': {
+            'pos': "Generate a realistic, natural, short (2-4 sentences) online review in English that is extremely positive (e.g. about a restaurant, hotel or product). Return only the generated text.",
+            'neg': "Generate a realistic, natural, short (2-4 sentences) online review in English that is extremely negative, disappointed and critical. Return only the generated text.",
+            'mixed': "Generate a short (2-4 sentences) review in English that has mixed feelings (partially praises and partially criticizes). Return only the generated text.",
+            'neutral': "Generate a completely neutral, short (2-4 sentences) factual text in English (e.g. business hours, scientific facts, address description). Return only the generated text.",
+            'ai1': "Generate a short (3-5 sentences) text about technology in English, written in a very formal, passive voice, utilizing connectors like 'furthermore', 'it should be noted', 'consequently' - typical of ChatGPT style. Return only the generated text.",
+            'ai2': "Generate a short (3-5 sentences) business/scientific paragraph in English with highly uniform sentence lengths typical of AI assistants. Return only the generated text.",
+            'human1': "Generate a short (2-4 sentences) comment in English written by a real human in a very informal, colloquial style, with abbreviations like lol, tbh, ngl, vibes, and casual punctuation. Return only the generated text.",
+            'human2': "Generate a short (2-4 sentences) expressive social media post in English with typical human emotion, exclamation marks, slang and casual tone. Return only the generated text."
+        }
+    }
+
+    # Default fallback examples (in case Gemini API is not active or fails)
+    fallbacks = {
+        'pl': {
+            'pos': "To miejsce jest absolutnie niesamowite! Jedzenie było pyszne, a obsługa niezwykle miła i pomocna. Na pewno wrócimy tu za tydzień. Bardzo polecam!",
+            'neg': "Tragedia, najgorsze miejsce w jakim byłem. Obsługa była niemiła, jedzenie zimne i niedobre, a czystość pozostawiała wiele do życzenia. Omijajcie szerokim łukiem!",
+            'mixed': "Jedzenie było całkiem smaczne i ładnie podane, ale czas oczekiwania wyniósł ponad godzinę. Obsługa wydawała się znudzona. Ceny są w porządku, ale mogło być lepiej.",
+            'neutral': "Restauracja znajduje się przy ulicy Głównej 12, obok poczty. Menu zawiera dania kuchni włoskiej. Czynne od poniedziałku do soboty od 11:00 do 22:00.",
+            'ai1': "Sztuczna inteligencja stanowi jeden z najbardziej kluczowych kierunków rozwoju nowoczesnej inżynierii oprogramowania. Ponadto, wdrożenie tych metod pozwala na znaczące usprawnienie procesów biznesowych. Warto zauważyć, że algorytmy uczenia maszynowego wykazują wysoką skuteczność. Podsumowując, technologia ta redefiniuje współczesne standardy.",
+            'ai2': "Zrównoważone źródła energii elektrycznej stanowią fundament współczesnej walki ze zmianami klimatycznymi. Dodatkowo, nowoczesne turbiny wiatrowe charakteryzują się optymalną sprawnością. Należy podkreślić, że inwestycje w infrastrukturę ekologiczną przynoszą wymierne korzyści ekonomiczne.",
+            'human1': "byłem wczoraj w tej nowej kawiarni i szczerze?? bez rewelacji lol. kawa jak kawa, a czekałem chyba ze 20 minut co mnie mega wkurzyło ngl. wnętrze ładne i spoko muzyka grała ale wifi było tak wolne, że nie dało się pracować...",
+            'human2': "właśnie skończyłam oglądać ten film i O MÓJ BOŻE!!! nie wiem jak zacząć, początek nudnawy ale ta końcówka to jakiś kosmos totalny!! nie spodziewałam się takiego obrotu spraw!! gra aktorska super, poryczałam się chyba z trzy razy :("
+        },
+        'en': {
+            'pos': "This restaurant is absolutely amazing! The food was incredibly delicious, and the staff was so friendly and welcoming. Highly recommend to everyone!",
+            'neg': "Terrible experience, worst restaurant ever. The food was cold and tasteless, and the waiter was extremely rude. Never coming back, save your money!",
+            'mixed': "The food was quite good and presentation was nice, but the service was slow. Prices are reasonable, so I might come back for a quick lunch.",
+            'neutral': "The restaurant is located at 42 Main Street. They serve Italian and Mediterranean cuisine. Opening hours are Monday to Saturday, 11am to 10pm.",
+            'ai1': "Artificial intelligence has emerged as a transformative technology, reshaping various sectors. Furthermore, the integration of machine learning algorithms enables organizations to optimize efficiency. It is important to note that these systems require careful oversight to maintain accuracy.",
+            'ai2': "The implementation of sustainable energy systems represents a critical imperative for global development. Wind power technologies have experienced significant advancements, resulting in lower costs. Consequently, demand for renewable options continues to rise.",
+            'human1': "ok so i went to this new place and honestly?? it was kinda mid lol. latte was fine i guess but nothing special... waited like 15 mins which was annoying. vibes were cool tho ngl.",
+            'human2': "just finished watching that movie and WOW. ok where do i even start. first hour was slow tbh but then it picks up and holy crap the plot twist!! did NOT see that coming at all!!"
+        }
+    }
+
+    # Fetch prompt
+    lang_prompts = prompts_map.get(lang, prompts_map['pl'])
+    prompt = lang_prompts.get(example_type, lang_prompts['pos'])
+
+    # Try Gemini
+    api_key = os.getenv("GEMINI_API_KEY", "").strip()
+    if api_key:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}]
+        }
+        headers = {"Content-Type": "application/json"}
+        try:
+            response = requests.post(url, json=payload, headers=headers, timeout=8)
+            if response.status_code == 200:
+                res_data = response.json()
+                candidates = res_data.get("candidates", [])
+                if candidates:
+                    text_content = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "").strip()
+                    if text_content:
+                        import urllib.parse
+                        # Clean potential wrapping quotes
+                        if text_content.startswith('"') and text_content.endswith('"'):
+                            text_content = text_content[1:-1]
+                        return jsonify({'text': text_content, 'source': 'gemini_ai'})
+        except Exception:
+            pass
+
+    # Fallback to local examples
+    lang_fallbacks = fallbacks.get(lang, fallbacks['pl'])
+    text_fallback = lang_fallbacks.get(example_type, lang_fallbacks['pos'])
+    return jsonify({'text': text_fallback, 'source': 'local_fallback'})
 
 if __name__ == '__main__':
     print("=" * 50)
